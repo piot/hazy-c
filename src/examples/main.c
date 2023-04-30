@@ -6,6 +6,7 @@
 #include <clog/clog.h>
 #include <clog/console.h>
 #include <time.h>
+#include <imprint/default_setup.h>
 
 clog_config g_clog;
 
@@ -23,7 +24,11 @@ int main(int argc, char *argv[])
 
     HazyConfig config = hazyConfigRecommended();
 
-    hazyInit(&hazy, 1024, config, log);
+    ImprintDefaultSetup imprintSetup;
+
+    imprintDefaultSetupInit(&imprintSetup, 16 * 1024);
+
+    hazyInit(&hazy, 1024, &imprintSetup.slabAllocator.info, config, log);
     hazyWrite(&hazy, (const uint8_t*) "Hello, world!", 14);
 
     CLOG_INFO("done!")

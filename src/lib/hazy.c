@@ -6,34 +6,83 @@
 #include <hazy/hazy.h>
 #include <stdbool.h>
 #include <udp-transport/udp_transport.h>
+#include <imprint/allocator.h>
 
 #define HAZY_LOG_ENABLE (0)
 
-static void hazyPacketSet(HazyPacket* packet, const uint8_t* buf, size_t octetsRead, MonotonicTimeMs timeToAct)
+static void hazyPacketsInit(HazyPackets* self, struct ImprintAllocatorWithFree* allocator)
 {
+    self->allocatorWithFree = allocator;
+    self->packetCount = 0;
+    self->capacity = HAZY_PACKETS_CAPACITY;
+    for (size_t i = 0; i < self->capacity; ++i) {
+        self->packets[i].indexForDebug = i;
+        self->packets[i].octetCount = 0;
+        self->packets[i].data = 0;
+        self->packets[i].timeToAct = 0;
+    }
+    self->lastTimeAdded = 0;
+    self->lastTimeIsValid = false;
+}
+
+/*
+ * int indexInDiscoidBuffer = discoidBufferWrite(&self->buffer, buf, octetsRead);
+if (indexInDiscoidBuffer < 0) {
+    CLOG_C_ERROR(log, "could not write packet data");
+}
+ discoidBufferInit(&self->buffer, allocator, 1200 * HAZY_PACKETS_CAPACITY);
+ */
+
+static HazyPacket* hazyPacketsFindFree(HazyPackets* self)
+{
+    for (size_t i=0; i<self->capacity; ++i) {
+        if (self->packets[i].data == 0) {
+            return &self->packets[i];
+        }
+    }
+
+    return 0;
+}
+
+static HazyPacket* hazyPacketsWrite(HazyPackets* self, const uint8_t* buf, size_t octetsRead, MonotonicTimeMs timeToAct,
+                             Clog* log)
+{
+    HazyPacket* packet = hazyPacketsFindFree(self);
+    if (packet == 0) {
+        CLOG_C_ERROR(log, "out of capacity")
+    }
+
     packet->octetCount = octetsRead;
-    packet->data = tc_malloc(octetsRead);
-    tc_memcpy_octets((void*) packet->data, buf, octetsRead);
+    uint8_t* target = IMPRINT_ALLOC_TYPE_COUNT(&self->allocatorWithFree->allocator, uint8_t, octetsRead);
+    tc_memcpy_octets(target, buf, octetsRead);
+    packet->data = target;
     packet->timeToAct = timeToAct;
     packet->created = monotonicTimeMsNow();
+    self->packetCount++;
+    self->lastTimeAdded = timeToAct;
+    self->lastTimeIsValid = true;
+
+    return packet;
+}
+
+static void hazyDestroyPacket(HazyPackets* self, HazyPacket* packetToDiscard)
+{
+    if (packetToDiscard->data == 0) {
+        CLOG_ERROR("illegal discard")
+    }
+    if (self->packetCount == 0) {
+        CLOG_ERROR("internal error")
+    }
+    IMPRINT_FREE(self->allocatorWithFree, packetToDiscard->data);
+    packetToDiscard->data = 0;
+    packetToDiscard->octetCount = 0;
+    self->packetCount--;
 }
 
 static bool hazyIsItTime(MonotonicTimeMs query)
 {
     MonotonicTimeMs now = monotonicTimeMsNow();
     return now >= query;
-}
-
-static HazyPacket* hazyFindFreePacket(HazyPackets* self)
-{
-    for (size_t i = 0; i < self->capacity; ++i) {
-        struct HazyPacket* packet = &self->packets[i];
-        if (!packet->octetCount) {
-            return packet;
-        }
-    }
-
-    return 0;
 }
 
 static const HazyPacket* hazyFindPacketToActOn(const HazyPackets* self)
@@ -100,23 +149,10 @@ static void calculateRanges(HazyRanges* rangeCollection, HazyConfigDirection con
     rangeCollection->rangeCount = index;
 }
 
-static void hazyPacketsInit(HazyPackets* packets)
-{
-    packets->capacity = HAZY_PACKETS_CAPACITY;
-    // tc_mem_clear_type_n(packets->packets, packets->capacity);
-    for (size_t i = 0; i < packets->capacity; ++i) {
-        packets->packets[i].indexForDebug = i;
-        packets->packets[i].octetCount = 0;
-        packets->packets[i].data = 0;
-        packets->packets[i].timeToAct = 0;
-    }
-    packets->lastAddedIndex = 0;
-    packets->lastAddedIndexIsValid = false;
-}
 
-static void hazyDirectionInit(HazyDirection* self, size_t capacity, HazyConfigDirection config)
+static void hazyDirectionInit(HazyDirection* self, size_t capacity, ImprintAllocatorWithFree* allocatorWithFree, HazyConfigDirection config)
 {
-    hazyPacketsInit(&self->packets);
+    hazyPacketsInit(&self->packets, allocatorWithFree);
     calculateRanges(&self->ranges, config);
 
     self->latency = config.maxLatency;
@@ -124,20 +160,22 @@ static void hazyDirectionInit(HazyDirection* self, size_t capacity, HazyConfigDi
 
 static void hazyDirectionReset(HazyDirection* self)
 {
-    hazyPacketsInit(&self->packets);
+    hazyPacketsInit(&self->packets, self->packets.allocatorWithFree);
 }
 
-void hazyInit(Hazy* self, size_t capacity, HazyConfig config, Clog log)
+void hazyInit(Hazy* self, size_t capacity, ImprintAllocator* allocator, ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log)
 {
     tc_snprintf(self->out.debugPrefix, 32, "%s/hazy/out", log.constantPrefix);
     self->out.log.config = log.config;
     self->out.log.constantPrefix = self->out.debugPrefix;
-    hazyDirectionInit(&self->out, capacity, config.out);
+    hazyDirectionInit(&self->out, capacity, allocatorWithFree, config.out);
 
     tc_snprintf(self->in.debugPrefix, 32, "%s/hazy/in", log.constantPrefix);
     self->in.log.config = log.config;
     self->in.log.constantPrefix = self->in.debugPrefix;
-    hazyDirectionInit(&self->in, capacity, config.in);
+    hazyDirectionInit(&self->in, capacity, allocatorWithFree, config.in);
+
+    discoidBufferInit(&self->receiveBuffer, allocator, 32 * 1024);
 
     self->log = log;
 }
@@ -178,15 +216,12 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
         return 0;
     }
 
-    HazyPacket* packet = hazyFindFreePacket(&self->packets);
-    if (packet == 0) {
-        CLOG_C_WARN(&self->log, "couldn't find free packet. dropping a packet", self->log)
-        return -2;
+    if (self->packets.packetCount >= HAZY_PACKETS_CAPACITY) {
+        CLOG_C_ERROR(&self->log, "overflow out of space")
+        return -45;
     }
-    self->packets.lastAddedIndex = packet->indexForDebug;
-    self->packets.lastAddedIndexIsValid = true;
 
-    hazyPacketSet(packet, data, octetCount, proposedTime);
+    HazyPacket* packet = hazyPacketsWrite(&self->packets, data, octetCount, proposedTime, &self->log);
 
 #if HAZY_LOG_ENABLE
     CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
@@ -196,12 +231,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
     return 0;
 }
 
-static void hazyDestroyPacket(HazyPacket* self)
-{
-    tc_free((void*) self->data);
-    self->data = 0;
-    self->octetCount = 0;
-}
+
 
 static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
 {
@@ -216,7 +246,7 @@ static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
         if (errorCode < 0) {
             return errorCode;
         }
-        hazyDestroyPacket((HazyPacket*) packet);
+        hazyDestroyPacket(self, (HazyPacket*) packet);
     }
 
     return 0;
@@ -225,15 +255,7 @@ static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
 static int hazyPacketsFeed(HazyPackets* self, const uint8_t* buf, size_t octetsRead, MonotonicTimeMs proposedTime,
                            Clog* log)
 {
-    HazyPacket* packet = hazyFindFreePacket(self);
-    if (packet == 0) {
-        CLOG_C_WARN(log, "out of capacity, dropping one packet");
-        return -3;
-    }
-
-    self->lastAddedIndex = packet->indexForDebug;
-
-    hazyPacketSet(packet, buf, octetsRead, proposedTime);
+    HazyPacket* packet = hazyPacketsWrite(self, buf, octetsRead, proposedTime, log);
 
 #if HAZY_LOG_ENABLE
 
@@ -253,10 +275,9 @@ static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCo
     MonotonicTimeMs now = monotonicTimeMsNow();
     MonotonicTimeMs proposedTime = now + self->latency;
 
-    if (self->packets.lastAddedIndexIsValid) {
-        MonotonicTimeMs lastPacketMs = self->packets.packets[self->packets.lastAddedIndex].timeToAct;
-        if ((proposedTime <= lastPacketMs) && !reorderAllowed) {
-            proposedTime = lastPacketMs + 1;
+    if (self->packets.lastTimeIsValid) {
+        if ((proposedTime <= self->packets.lastTimeAdded) && !reorderAllowed) {
+            proposedTime = self->packets.lastTimeAdded + 1;
         }
     }
 
@@ -347,6 +368,31 @@ static MonotonicTimeMs updateLatency(HazyDirection* self)
     return self->latency;
 }
 
+static void movePacketsToIncomingBuffer(Hazy* self)
+{
+    while (1) {
+        const HazyPacket* packet = hazyFindPacketToActOn(&self->in.packets);
+        if (packet == 0) {
+            return;
+        }
+        DiscoidBuffer* receiveBuffer = &self->receiveBuffer;
+
+        const size_t headerSize = 2;
+        size_t neededOctetCount =  packet->octetCount + headerSize;
+        if (discoidBufferWriteAvailable(receiveBuffer) < neededOctetCount) {
+            CLOG_C_NOTICE(&self->log, "receive buffer is full, so intentionally dropping package")
+        } else {
+            uint16_t serializeOctetCount = packet->octetCount;
+//            int64_t monotonicTime = packet->timeToAct;
+            discoidBufferWrite(receiveBuffer, (const uint8_t *) &serializeOctetCount, 2);
+            discoidBufferWrite(receiveBuffer, packet->data, packet->octetCount);
+        }
+
+
+        hazyDestroyPacket(&self->in.packets, (HazyPacket*) packet);
+    }
+}
+
 void hazyUpdate(Hazy* self)
 {
     // updateLatency(self);
@@ -354,6 +400,7 @@ void hazyUpdate(Hazy* self)
     MonotonicTimeMs now = monotonicTimeMsNow();
     CLOG_C_VERBOSE(&self->log, "time is now %lu", now);
 #endif
+    movePacketsToIncomingBuffer(self);
 }
 
 int hazyUpdateAndCommunicate(Hazy* self, UdpTransportInOut* socket)
@@ -393,22 +440,36 @@ static int hazyPacketsRead(HazyPackets* self, uint8_t* data, size_t capacity, Cl
         CLOG_C_WARN(log, "couldn't copy to target, capacity too small")
         octetCount = -4;
     }
-
-    hazyDestroyPacket((HazyPacket*) packet);
+    hazyDestroyPacket(self, (HazyPacket*) packet);
 
     return octetCount;
 }
 
 int hazyRead(Hazy* self, uint8_t* data, size_t capacity)
 {
-    return hazyPacketsRead(&self->in.packets, data, capacity, &self->log);
+    if (discoidBufferReadAvailable(&self->receiveBuffer) < 2) {
+        return 0;
+    }
+
+    uint16_t octetLength = 0;
+    int error = discoidBufferRead(&self->receiveBuffer, (uint8_t *) &octetLength, sizeof(uint16_t));
+    if (error < 0) {
+        return error;
+    }
+
+    if (capacity < octetLength) {
+        CLOG_C_ERROR(&self->log, "packet length greater than capacity")
+    }
+
+    discoidBufferRead(&self->receiveBuffer, data, octetLength);
+
+    return (int)octetLength;
 }
 
 int hazyReadSend(Hazy* self, uint8_t* data, size_t capacity)
 {
     return hazyPacketsRead(&self->out.packets, data, capacity, &self->log);
 }
-
 
 HazyConfigDirection hazyConfigDirectionGoodCondition(void)
 {

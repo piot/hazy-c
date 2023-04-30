@@ -10,7 +10,6 @@ else ()
     set(isDebug FALSE)
 endif ()
 
-
 if (isDebug)
     message("Debug build detected")
     add_compile_definitions(CONFIGURATION_DEBUG TYRAN_CONFIGURATION_DEBUG)
@@ -19,13 +18,6 @@ endif ()
 
 
 set(deps ../deps/)
-
-include_directories(${deps}piot/tiny-libc/src/include)
-include_directories(${deps}piot/udp-transport/src/include)
-include_directories(${deps}piot/monotonic-time-c/src/include)
-include_directories(${deps}piot/clog/src/include)
-include_directories(include)
-
 
 file(GLOB_RECURSE deps_src FOLLOW_SYMLINKS
         "${deps}piot/*/src/lib/*.c"
@@ -36,11 +28,26 @@ file(GLOB_RECURSE lib_src FOLLOW_SYMLINKS
         "lib/*.c"
         )
 
+
+
 add_executable(hazy_example
         ${deps_src}
         ${lib_src}
         examples/main.c
         )
+
+
+target_include_directories(hazy_example PUBLIC ${deps}piot/tiny-libc/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/udp-transport/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/monotonic-time-c/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/clog/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/discoid-c/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/imprint/src/include)
+
+target_include_directories(hazy_example PUBLIC include)
+
+
+
 
 
 if (OS_WINDOWS)

@@ -10,8 +10,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <discoid/circular_buffer.h>
 
 struct UdpTransportInOut;
+struct ImprintAllocatorWithFree;
+struct ImprintAllocator;
 
 typedef enum HazyDecision {
     HazyDecisionDuplicate,
@@ -34,9 +37,11 @@ typedef struct HazyPacket {
 
 typedef struct HazyPackets {
     HazyPacket packets[HAZY_PACKETS_CAPACITY];
+    size_t packetCount;
     size_t capacity;
-    size_t lastAddedIndex;
-    bool lastAddedIndexIsValid;
+    struct ImprintAllocatorWithFree* allocatorWithFree;
+    MonotonicTimeMs lastTimeAdded;
+    bool lastTimeIsValid;
 } HazyPackets;
 
 typedef struct HazyRange {
@@ -77,10 +82,11 @@ typedef struct HazyConfig {
 typedef struct Hazy {
     HazyDirection out;
     HazyDirection in;
+    DiscoidBuffer receiveBuffer;
     Clog log;
 } Hazy;
 
-void hazyInit(Hazy* self, size_t capacity, HazyConfig config, Clog log);
+void hazyInit(Hazy* self, size_t capacity, struct ImprintAllocator* allocator, struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 void hazyReset(Hazy* self);
 void hazyUpdate(Hazy* self);
 int hazyUpdateAndCommunicate(Hazy* self, struct UdpTransportInOut* socket);

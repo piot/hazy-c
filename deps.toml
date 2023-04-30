@@ -14,3 +14,8 @@ version = "*"
 [[dependencies]]
 name = 'piot/monotonic-time-c'
 version = "*"
+
+
+[[dependencies]]
+name = 'piot/discoid-c'
+version = "*"
