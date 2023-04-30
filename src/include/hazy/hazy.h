@@ -90,9 +90,11 @@ void hazySetConfig(Hazy* self, HazyConfig config);
 int hazyReadSend(Hazy* self, uint8_t* data, size_t capacity);
 int hazyFeedRead(Hazy* self, const uint8_t* data, size_t capacity);
 
+HazyConfigDirection hazyConfigDirectionGoodCondition(void);
 HazyConfigDirection hazyConfigDirectionRecommended(void);
 HazyConfigDirection hazyConfigDirectionWorstCase(void);
 
+HazyConfig hazyConfigGoodCondition(void);
 HazyConfig hazyConfigRecommended(void);
 HazyConfig hazyConfigWorstCase(void);
 

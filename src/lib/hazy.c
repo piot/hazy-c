@@ -409,17 +409,31 @@ int hazyReadSend(Hazy* self, uint8_t* data, size_t capacity)
     return hazyPacketsRead(&self->out.packets, data, capacity, &self->log);
 }
 
+
+HazyConfigDirection hazyConfigDirectionGoodCondition(void)
+{
+    HazyConfigDirection config = {100, 1, 3, 14, 25, 2};
+
+    return config;
+}
+
 HazyConfigDirection hazyConfigDirectionRecommended(void)
 {
-    HazyConfigDirection config = {100, 1, 3, 14, 150, 4};
+    HazyConfigDirection config = {100, 1, 7, 14, 150, 4};
 
     return config;
 }
 
 HazyConfigDirection hazyConfigDirectionWorstCase(void)
 {
-    HazyConfigDirection config = {100, 10, 10, 34, 150, 20};
+    HazyConfigDirection config = {100, 10, 10, 34, 250, 20};
 
+    return config;
+}
+
+HazyConfig hazyConfigGoodCondition(void)
+{
+    HazyConfig config = {hazyConfigDirectionGoodCondition(), hazyConfigDirectionGoodCondition()};
     return config;
 }
 
