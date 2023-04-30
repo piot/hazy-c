@@ -247,7 +247,7 @@ static int hazyPacketsFeed(HazyPackets* self, const uint8_t* buf, size_t octetsR
 static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
 {
 #if HAZY_LOG_ENABLE
-    CLOG_C_VERBOSE("hazy: write out %zu octetCount latency:%d", octetCount, self->latency);
+    CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency);
 #endif
 
     MonotonicTimeMs now = monotonicTimeMsNow();
@@ -418,7 +418,7 @@ HazyConfigDirection hazyConfigDirectionRecommended(void)
 
 HazyConfigDirection hazyConfigDirectionWorstCase(void)
 {
-    HazyConfigDirection config = {100, 10, 10, 34, 330, 4};
+    HazyConfigDirection config = {100, 10, 10, 34, 150, 20};
 
     return config;
 }
