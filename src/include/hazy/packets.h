@@ -6,11 +6,11 @@
 #define HAZY_PACKETS_H
 
 #include <clog/clog.h>
+#include <discoid/circular_buffer.h>
 #include <monotonic-time/monotonic_time.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <discoid/circular_buffer.h>
 
 typedef struct HazyPacket {
     const uint8_t* data;
@@ -40,6 +40,4 @@ void hazyPacketsDestroyPacket(HazyPackets* self, HazyPacket* packetToDiscard);
 
 const HazyPacket* hazyPacketsFindPacketToActOn(const HazyPackets* self);
 
-
 #endif
-

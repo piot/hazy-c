@@ -5,9 +5,9 @@
 #ifndef HAZY_LATENCY_H
 #define HAZY_LATENCY_H
 
-#include <hazy/decider.h>
 #include <clog/clog.h>
 #include <discoid/circular_buffer.h>
+#include <hazy/decider.h>
 #include <hazy/packets.h>
 #include <monotonic-time/monotonic_time.h>
 #include <stdbool.h>
@@ -22,11 +22,19 @@ typedef struct HazyLatencyConfig {
 
 typedef uint16_t HazyLatencyMs;
 
+typedef enum HazyLatencyPhase {
+    HazyLatencyPhaseNormal,
+    HazyLatencyPhaseDrifting,
+} HazyLatencyPhase;
+
 typedef struct HazyLatency {
     HazyLatencyMs latency;
+    float precisionLatency;
     HazyLatencyMs targetLatency;
-    MonotonicTimeMs lastDriftEstimationMs;
+    MonotonicTimeMs nextDriftEstimationMs;
     HazyLatencyConfig config;
+    HazyLatencyPhase phase;
+    MonotonicTimeMs lastUpdateTimeMs;
     Clog log;
 } HazyLatency;
 
@@ -40,4 +48,3 @@ HazyLatencyConfig hazyLatencyRecommended(void);
 HazyLatencyConfig hazyLatencyWorstCase(void);
 
 #endif
-

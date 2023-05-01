@@ -8,13 +8,13 @@
 #include "decider.h"
 #include <clog/clog.h>
 #include <discoid/circular_buffer.h>
-#include <hazy/packets.h>
+#include <hazy/direction.h>
 #include <hazy/latency.h>
+#include <hazy/packets.h>
 #include <monotonic-time/monotonic_time.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <hazy/direction.h>
 
 struct UdpTransportInOut;
 struct ImprintAllocatorWithFree;
@@ -32,7 +32,8 @@ typedef struct Hazy {
     Clog log;
 } Hazy;
 
-void hazyInit(Hazy* self, size_t capacity, struct ImprintAllocator* allocator, struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
+void hazyInit(Hazy* self, size_t capacity, struct ImprintAllocator* allocator,
+              struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 void hazyReset(Hazy* self);
 void hazyUpdate(Hazy* self);
 int hazyUpdateAndCommunicate(Hazy* self, struct UdpTransportInOut* socket);

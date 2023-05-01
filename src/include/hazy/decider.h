@@ -5,16 +5,15 @@
 #ifndef HAZY_DECISION_H
 #define HAZY_DECISION_H
 
-#include <stddef.h>
 #include <clog/clog.h>
+#include <stddef.h>
 
 typedef enum HazyDecision {
     HazyDecisionDuplicate,
     HazyDecisionDrop,
-    HazyDecisionGarble,
+    HazyDecisionTamper,
     HazyDecisionOriginal,
-    HazyDecisionReorder,
-    HazyDecisionMAX
+    HazyDecisionOutOfOrder,
 } HazyDecision;
 
 typedef struct HazyDecisionRange {
@@ -26,14 +25,16 @@ typedef struct HazyDecider {
     size_t max;
     size_t rangeCount;
     HazyDecision decision;
-    HazyDecisionRange ranges[10];
+    HazyDecisionRange ranges[5]; // NOTE: Must match number of fields in HazyDeciderConfig
     Clog log;
 } HazyDecider;
 
 typedef struct HazyDeciderConfig {
     size_t originalChance;
     size_t dropChance;
+    size_t outOfOrderChance;
     size_t duplicateChance;
+    size_t tamperChance;
 } HazyDeciderConfig;
 
 HazyDeciderConfig hazyDeciderGoodCondition(void);

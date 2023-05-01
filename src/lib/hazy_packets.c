@@ -24,14 +24,6 @@ void hazyPacketsInit(HazyPackets* self, struct ImprintAllocatorWithFree* allocat
     self->lastTimeIsValid = false;
 }
 
-/*
- * int indexInDiscoidBuffer = discoidBufferWrite(&self->buffer, buf, octetsRead);
-if (indexInDiscoidBuffer < 0) {
-    CLOG_C_ERROR(log, "could not write packet data");
-}
- discoidBufferInit(&self->buffer, allocator, 1200 * HAZY_PACKETS_CAPACITY);
- */
-
 static HazyPacket* hazyPacketsFindFree(HazyPackets* self)
 {
     for (size_t i = 0; i < self->capacity; ++i) {

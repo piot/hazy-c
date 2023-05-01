@@ -6,6 +6,14 @@
 #include <hazy/decider.h>
 #include <hazy/hazy.h>
 
+#define ADD_RANGE(fieldName, enumName)                                                                                 \
+    if (config.fieldName > 0) {                                                                                        \
+        last += config.fieldName;                                                                                      \
+        ranges[index].max = last;                                                                                      \
+        ranges[index].decision = enumName;                                                                             \
+        index++;                                                                                                       \
+    }
+
 static void recalculateRanges(HazyDecider* self, HazyDeciderConfig config)
 {
     int last = 0;
@@ -13,26 +21,11 @@ static void recalculateRanges(HazyDecider* self, HazyDeciderConfig config)
 
     HazyDecisionRange* ranges = self->ranges;
 
-    if (config.originalChance > 0) {
-        last += config.originalChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionOriginal;
-        index++;
-    }
-
-    if (config.dropChance > 0) {
-        last += config.dropChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionDrop;
-        index++;
-    }
-
-    if (config.duplicateChance > 0) {
-        last += config.duplicateChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionDuplicate;
-        index++;
-    }
+    ADD_RANGE(originalChance, HazyDecisionOriginal)
+    ADD_RANGE(dropChance, HazyDecisionDrop)
+    ADD_RANGE(outOfOrderChance, HazyDecisionOutOfOrder)
+    ADD_RANGE(duplicateChance, HazyDecisionDuplicate)
+    ADD_RANGE(tamperChance, HazyDecisionTamper)
 
     self->max = last;
     self->rangeCount = index;
@@ -57,8 +50,7 @@ HazyDecision hazyDeciderDecide(HazyDecider* self)
     size_t value = rand() % self->max;
 
     for (size_t i = 0; i < self->rangeCount; ++i) {
-        if (self->ranges[i].max > value) {
-            //CLOG_C_VERBOSE(&self->log, "decision was: %d", self->ranges[i].decision)
+        if (value < self->ranges[i].max) {
             return self->ranges[i].decision;
         }
     }
@@ -68,21 +60,21 @@ HazyDecision hazyDeciderDecide(HazyDecider* self)
 
 HazyDeciderConfig hazyDeciderGoodCondition(void)
 {
-    HazyDeciderConfig config = {100, 1, 3, 14, 25, 2};
+    HazyDeciderConfig config = {100000, 1, 300, 300, 0};
 
     return config;
 }
 
 HazyDeciderConfig hazyDeciderRecommended(void)
 {
-    HazyDeciderConfig config = {100, 1, 7, 14, 150, 4};
+    HazyDeciderConfig config = {1000, 10, 10, 10, 0};
 
     return config;
 }
 
 HazyDeciderConfig hazyDeciderWorstCase(void)
 {
-    HazyDeciderConfig config = {100, 10, 10, 34, 250, 20};
+    HazyDeciderConfig config = {100, 3, 15, 15, 5};
 
     return config;
 }

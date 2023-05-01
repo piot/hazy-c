@@ -4,11 +4,21 @@
  *--------------------------------------------------------------------------------------------*/
 #include <hazy/direction.h>
 
-void hazyDirectionInit(HazyDirection* self, size_t capacity, struct ImprintAllocatorWithFree* allocatorWithFree, HazyDirectionConfig config, Clog log)
+static HazyLatencyConfig halfConfig(HazyLatencyConfig config)
+{
+    config.latencyJitter = config.latencyJitter / 2;
+    config.minLatency = config.minLatency / 2;
+    config.maxLatency = config.maxLatency / 2;
+
+    return config;
+}
+
+void hazyDirectionInit(HazyDirection* self, size_t capacity, struct ImprintAllocatorWithFree* allocatorWithFree,
+                       HazyDirectionConfig config, Clog log)
 {
     hazyPacketsInit(&self->packets, allocatorWithFree);
     hazyDeciderInit(&self->decider, config.decider, log);
-    hazyLatencyInit(&self->latency, config.latency, log);
+    hazyLatencyInit(&self->latency, halfConfig(config.latency), log);
 }
 
 void hazyDirectionReset(HazyDirection* self)
@@ -19,7 +29,7 @@ void hazyDirectionReset(HazyDirection* self)
 void hazyDirectionSetConfig(HazyDirection* self, HazyDirectionConfig config)
 {
     hazyDeciderSetConfig(&self->decider, config.decider);
-    hazyLatencySetConfig(&self->latency, config.latency);
+    hazyLatencySetConfig(&self->latency, halfConfig(config.latency));
 }
 
 static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t octetCount, MonotonicTimeMs proposedTime)
@@ -42,7 +52,6 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
 
     return 0;
 }
-
 
 static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
 {
@@ -69,36 +78,37 @@ int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCou
     int result = 0;
     switch (decision) {
         case HazyDecisionDrop:
-            CLOG_C_VERBOSE(&self->log, "dropped packet")
+            CLOG_C_VERBOSE(&self->log, "decision: dropped packet")
             return 0;
-        case HazyDecisionDuplicate:
-            CLOG_C_VERBOSE(&self->log, "duplicate packet")
-            hazyWriteOut(self, data, octetCount, false);
-            result = hazyWriteOut(self, data, octetCount, false);
-            break;
-        case HazyDecisionReorder: {
-            CLOG_C_VERBOSE(&self->log, "reorder packet")
+        case HazyDecisionDuplicate: {
+            int count = (rand() % 3) + 1;
+            CLOG_C_VERBOSE(&self->log, "decision: duplicate packet %d count", count)
+            for (int i = 0; i < count; ++i) {
+                hazyWriteOut(self, data, octetCount, false);
+                result = hazyWriteOut(self, data, octetCount, false);
+            }
+        } break;
+        case HazyDecisionOutOfOrder: {
+            CLOG_C_VERBOSE(&self->log, "decision: out of order packet")
             // Send this in the future so it is likely reordered
             MonotonicTimeMs latency = self->latency.latency;
-            const int sendInterval = 16; // 16 ms
-            const int reorderLatency = sendInterval * 3;
+            const int sendInterval = 16; // ms
+            const int reorderLatency = sendInterval * ((rand() % 3) + 1);
             self->latency.latency += reorderLatency;
             result = hazyWriteOut(self, data, octetCount, true);
             self->latency.latency = latency;
         } break;
-        case HazyDecisionGarble: {
+        case HazyDecisionTamper: {
             uint8_t temp[1200];
             for (size_t index = 0; index < octetCount; ++index) {
                 temp[index] = (uint8_t) rand();
             }
             result = hazyWriteOut(self, temp, octetCount, false);
-            CLOG_C_VERBOSE(&self->log, "garble packet")
+            CLOG_C_VERBOSE(&self->log, "decision: garble packet")
         } break;
         case HazyDecisionOriginal:
-            CLOG_C_VERBOSE(&self->log, "woriginal")
+            CLOG_C_VERBOSE(&self->log, "decision: original")
             result = hazyWriteOut(self, data, octetCount, false);
-            break;
-        case HazyDecisionMAX:
             break;
     }
 

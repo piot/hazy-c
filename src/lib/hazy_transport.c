@@ -18,7 +18,8 @@ static int hazyDatagramTransportReceiveFn(void* self_, uint8_t* data, size_t siz
     return hazyRead(&self->hazy, data, size);
 }
 
-void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTransportInOut other, struct ImprintAllocator* allocator,
+void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTransportInOut other,
+                                    struct ImprintAllocator* allocator,
                                     struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log)
 {
     self->transport.receive = hazyDatagramTransportReceiveFn;
