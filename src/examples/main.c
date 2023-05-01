@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 #include <hazy/hazy.h>
-#include <clog/clog.h>
 #include <clog/console.h>
 #include <time.h>
 #include <imprint/default_setup.h>
@@ -19,7 +18,7 @@ int main(int argc, char *argv[])
     Hazy hazy;
 
     Clog log;
-    log.config = &g_clog.log;
+    log.config = &g_clog;
     log.constantPrefix = "example";
 
     HazyConfig config = hazyConfigRecommended();
@@ -28,7 +27,9 @@ int main(int argc, char *argv[])
 
     imprintDefaultSetupInit(&imprintSetup, 16 * 1024);
 
-    hazyInit(&hazy, 1024, &imprintSetup.slabAllocator.info, config, log);
+    hazyInit(&hazy, 1024, &imprintSetup.tagAllocator.info, &imprintSetup.slabAllocator.info, config, log);
+
+    hazyUpdate(&hazy);
     hazyWrite(&hazy, (const uint8_t*) "Hello, world!", 14);
 
     CLOG_INFO("done!")

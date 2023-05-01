@@ -4,176 +4,23 @@
  *--------------------------------------------------------------------------------------------*/
 #include <clog/clog.h>
 #include <hazy/hazy.h>
-#include <stdbool.h>
-#include <udp-transport/udp_transport.h>
 #include <imprint/allocator.h>
+#include <udp-transport/udp_transport.h>
 
 #define HAZY_LOG_ENABLE (0)
 
-static void hazyPacketsInit(HazyPackets* self, struct ImprintAllocatorWithFree* allocator)
-{
-    self->allocatorWithFree = allocator;
-    self->packetCount = 0;
-    self->capacity = HAZY_PACKETS_CAPACITY;
-    for (size_t i = 0; i < self->capacity; ++i) {
-        self->packets[i].indexForDebug = i;
-        self->packets[i].octetCount = 0;
-        self->packets[i].data = 0;
-        self->packets[i].timeToAct = 0;
-    }
-    self->lastTimeAdded = 0;
-    self->lastTimeIsValid = false;
-}
-
-/*
- * int indexInDiscoidBuffer = discoidBufferWrite(&self->buffer, buf, octetsRead);
-if (indexInDiscoidBuffer < 0) {
-    CLOG_C_ERROR(log, "could not write packet data");
-}
- discoidBufferInit(&self->buffer, allocator, 1200 * HAZY_PACKETS_CAPACITY);
- */
-
-static HazyPacket* hazyPacketsFindFree(HazyPackets* self)
-{
-    for (size_t i=0; i<self->capacity; ++i) {
-        if (self->packets[i].data == 0) {
-            return &self->packets[i];
-        }
-    }
-
-    return 0;
-}
-
-static HazyPacket* hazyPacketsWrite(HazyPackets* self, const uint8_t* buf, size_t octetsRead, MonotonicTimeMs timeToAct,
-                             Clog* log)
-{
-    HazyPacket* packet = hazyPacketsFindFree(self);
-    if (packet == 0) {
-        CLOG_C_ERROR(log, "out of capacity")
-    }
-
-    packet->octetCount = octetsRead;
-    uint8_t* target = IMPRINT_ALLOC_TYPE_COUNT(&self->allocatorWithFree->allocator, uint8_t, octetsRead);
-    tc_memcpy_octets(target, buf, octetsRead);
-    packet->data = target;
-    packet->timeToAct = timeToAct;
-    packet->created = monotonicTimeMsNow();
-    self->packetCount++;
-    self->lastTimeAdded = timeToAct;
-    self->lastTimeIsValid = true;
-
-    return packet;
-}
-
-static void hazyDestroyPacket(HazyPackets* self, HazyPacket* packetToDiscard)
-{
-    if (packetToDiscard->data == 0) {
-        CLOG_ERROR("illegal discard")
-    }
-    if (self->packetCount == 0) {
-        CLOG_ERROR("internal error")
-    }
-    IMPRINT_FREE(self->allocatorWithFree, packetToDiscard->data);
-    packetToDiscard->data = 0;
-    packetToDiscard->octetCount = 0;
-    self->packetCount--;
-}
-
-static bool hazyIsItTime(MonotonicTimeMs query)
-{
-    MonotonicTimeMs now = monotonicTimeMsNow();
-    return now >= query;
-}
-
-static const HazyPacket* hazyFindPacketToActOn(const HazyPackets* self)
-{
-    MonotonicTimeMs now = monotonicTimeMsNow();
-    MonotonicTimeMs minimumToActOn = 0;
-    const HazyPacket* foundPacket = 0;
-    for (size_t i = 0; i < self->capacity; ++i) {
-        const HazyPacket* packet = &self->packets[i];
-        if (packet->octetCount && now >= packet->timeToAct) {
-            MonotonicTimeMs timeSinceThreshold = packet->timeToAct - now;
-            if (timeSinceThreshold < minimumToActOn) {
-                minimumToActOn = timeSinceThreshold;
-                foundPacket = packet;
-            }
-        }
-    }
-
-    if (foundPacket) {
-#if HAZY_LOG_ENABLE
-        MonotonicTimeMs nowMs = monotonicTimeMsNow();
-        MonotonicTimeMs delayedMs = nowMs - foundPacket->created;
-        MonotonicTimeMs intendedLatencyMs = nowMs - foundPacket->timeToAct;
-        CLOG_C_VERBOSE(&self->log, "found packet: actual latency: %ld (intended was %ld) time: %lu", delayedMs,
-                       intendedLatencyMs, nowMs)
-        if (delayedMs > 100) {
-            delayedMs = 0;
-        }
-#endif
-    }
-
-    return foundPacket;
-}
-
-static void calculateRanges(HazyRanges* rangeCollection, HazyConfigDirection config)
-{
-    int last = 0;
-    int index = 0;
-
-    HazyRange* ranges = rangeCollection->ranges;
-
-    if (config.originalChance > 0) {
-        last += config.originalChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionOriginal;
-        index++;
-    }
-
-    if (config.dropChance > 0) {
-        last += config.dropChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionDrop;
-        index++;
-    }
-
-    if (config.duplicateChance > 0) {
-        last += config.duplicateChance;
-        ranges[index].max = last;
-        ranges[index].decision = HazyDecisionDuplicate;
-        index++;
-    }
-
-    rangeCollection->max = last;
-    rangeCollection->rangeCount = index;
-}
-
-
-static void hazyDirectionInit(HazyDirection* self, size_t capacity, ImprintAllocatorWithFree* allocatorWithFree, HazyConfigDirection config)
-{
-    hazyPacketsInit(&self->packets, allocatorWithFree);
-    calculateRanges(&self->ranges, config);
-
-    self->latency = config.maxLatency;
-}
-
-static void hazyDirectionReset(HazyDirection* self)
-{
-    hazyPacketsInit(&self->packets, self->packets.allocatorWithFree);
-}
-
-void hazyInit(Hazy* self, size_t capacity, ImprintAllocator* allocator, ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log)
+void hazyInit(Hazy* self, size_t capacity, ImprintAllocator* allocator, ImprintAllocatorWithFree* allocatorWithFree,
+              HazyConfig config, Clog log)
 {
     tc_snprintf(self->out.debugPrefix, 32, "%s/hazy/out", log.constantPrefix);
     self->out.log.config = log.config;
     self->out.log.constantPrefix = self->out.debugPrefix;
-    hazyDirectionInit(&self->out, capacity, allocatorWithFree, config.out);
+    hazyDirectionInit(&self->out, capacity, allocatorWithFree, config.out, self->out.log);
 
     tc_snprintf(self->in.debugPrefix, 32, "%s/hazy/in", log.constantPrefix);
     self->in.log.config = log.config;
     self->in.log.constantPrefix = self->in.debugPrefix;
-    hazyDirectionInit(&self->in, capacity, allocatorWithFree, config.in);
+    hazyDirectionInit(&self->in, capacity, allocatorWithFree, config.in, self->in.log);
 
     discoidBufferInit(&self->receiveBuffer, allocator, 32 * 1024);
 
@@ -188,55 +35,14 @@ void hazyReset(Hazy* self)
 
 void hazySetConfig(Hazy* self, HazyConfig config)
 {
-    calculateRanges(&self->in.ranges, config.in);
-    self->in.latency = config.in.maxLatency;
-    calculateRanges(&self->out.ranges, config.out);
-    self->out.latency = config.in.maxLatency;
+    hazyDirectionSetConfig(&self->in, config.in);
+    hazyDirectionSetConfig(&self->out, config.out);
 }
-
-/// decide
-/// @param self
-/// @return
-static HazyDecision hazyDeciderDecide(HazyRanges* self)
-{
-    size_t value = rand() % self->max;
-
-    for (size_t i = 0; i < self->rangeCount; ++i) {
-        if (self->ranges[i].max > value) {
-            return self->ranges[i].decision;
-        }
-    }
-
-    CLOG_ERROR("hazy: internal error")
-}
-
-static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t octetCount, MonotonicTimeMs proposedTime)
-{
-    if (octetCount == 0) {
-        return 0;
-    }
-
-    if (self->packets.packetCount >= HAZY_PACKETS_CAPACITY) {
-        CLOG_C_ERROR(&self->log, "overflow out of space")
-        return -45;
-    }
-
-    HazyPacket* packet = hazyPacketsWrite(&self->packets, data, octetCount, proposedTime, &self->log);
-
-#if HAZY_LOG_ENABLE
-    CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
-                   randomMillisecondsLatency);
-#endif
-
-    return 0;
-}
-
-
 
 static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
 {
     while (1) {
-        const HazyPacket* packet = hazyFindPacketToActOn(self);
+        const HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
         if (packet == 0) {
             break;
         }
@@ -246,7 +52,7 @@ static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
         if (errorCode < 0) {
             return errorCode;
         }
-        hazyDestroyPacket(self, (HazyPacket*) packet);
+        hazyPacketsDestroyPacket(self, (HazyPacket*) packet);
     }
 
     return 0;
@@ -264,64 +70,6 @@ static int hazyPacketsFeed(HazyPackets* self, const uint8_t* buf, size_t octetsR
 #endif
 
     return 0;
-}
-
-static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
-{
-#if HAZY_LOG_ENABLE
-    CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency);
-#endif
-
-    MonotonicTimeMs now = monotonicTimeMsNow();
-    MonotonicTimeMs proposedTime = now + self->latency;
-
-    if (self->packets.lastTimeIsValid) {
-        if ((proposedTime <= self->packets.lastTimeAdded) && !reorderAllowed) {
-            proposedTime = self->packets.lastTimeAdded + 1;
-        }
-    }
-
-    return hazyWriteInternal(self, data, octetCount, proposedTime);
-}
-
-static int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCount)
-{
-    HazyDecision decision = hazyDeciderDecide(&self->ranges);
-
-    int result = 0;
-    switch (decision) {
-        case HazyDecisionDrop:
-            CLOG_C_VERBOSE(&self->log, "dropped packet")
-            return 0;
-        case HazyDecisionDuplicate:
-            CLOG_C_VERBOSE(&self->log, "duplicate packet")
-            hazyWriteOut(self, data, octetCount, false);
-            result = hazyWriteOut(self, data, octetCount, false);
-            break;
-        case HazyDecisionReorder: {
-            CLOG_C_VERBOSE(&self->log, "reorder packet")
-            MonotonicTimeMs latency = self->latency;
-            self->latency = -12;
-            result = hazyWriteOut(self, data, octetCount, true);
-            self->latency = latency;
-        } break;
-        case HazyDecisionGarble: {
-            uint8_t temp[1200];
-            for (size_t index = 0; index < octetCount; ++index) {
-                temp[index] = (uint8_t) rand();
-            }
-            result = hazyWriteOut(self, temp, octetCount, false);
-            CLOG_C_VERBOSE(&self->log, "garble packet")
-        } break;
-        case HazyDecisionOriginal:
-            CLOG_C_VERBOSE(&self->log, "original")
-            result = hazyWriteOut(self, data, octetCount, false);
-            break;
-        case HazyDecisionMAX:
-            break;
-    }
-
-    return result;
 }
 
 int hazyWrite(Hazy* self, const uint8_t* data, size_t octetLength)
@@ -344,62 +92,36 @@ static int hazyReadFromUdp(HazyDirection* self, UdpTransportInOut* socket)
     return hazyWriteDirection(self, buf, octetsRead);
 }
 
-static int sign(int x)
-{
-    return (x > 0) ? 1 : ((x < 0) ? -1 : 0);
-}
-
-static MonotonicTimeMs updateLatency(HazyDirection* self)
-{
-    int diff = (self->targetLatency - self->latency);
-    if (diff == 0) {
-        diff = 1;
-    }
-    int delta = rand() % abs(diff);
-    delta += rand() % 40;
-    delta *= sign(diff);
-    if (((int) self->latency + delta) > 0) {
-        self->latency += delta;
-    }
-#if HAZY_LOG_ENABLE || 1
-    CLOG_C_VERBOSE(&self->log, "new latency: %d", self->latency)
-#endif
-
-    return self->latency;
-}
-
 static void movePacketsToIncomingBuffer(Hazy* self)
 {
     while (1) {
-        const HazyPacket* packet = hazyFindPacketToActOn(&self->in.packets);
+        const HazyPacket* packet = hazyPacketsFindPacketToActOn(&self->in.packets);
         if (packet == 0) {
             return;
         }
         DiscoidBuffer* receiveBuffer = &self->receiveBuffer;
 
         const size_t headerSize = 2;
-        size_t neededOctetCount =  packet->octetCount + headerSize;
+        size_t neededOctetCount = packet->octetCount + headerSize;
         if (discoidBufferWriteAvailable(receiveBuffer) < neededOctetCount) {
             CLOG_C_NOTICE(&self->log, "receive buffer is full, so intentionally dropping package")
         } else {
             uint16_t serializeOctetCount = packet->octetCount;
-//            int64_t monotonicTime = packet->timeToAct;
-            discoidBufferWrite(receiveBuffer, (const uint8_t *) &serializeOctetCount, 2);
+            //            int64_t monotonicTime = packet->timeToAct;
+            discoidBufferWrite(receiveBuffer, (const uint8_t*) &serializeOctetCount, 2);
             discoidBufferWrite(receiveBuffer, packet->data, packet->octetCount);
         }
 
-
-        hazyDestroyPacket(&self->in.packets, (HazyPacket*) packet);
+        hazyPacketsDestroyPacket(&self->in.packets, (HazyPacket*) packet);
     }
 }
 
 void hazyUpdate(Hazy* self)
 {
-    // updateLatency(self);
-#if HAZY_LOG_ENABLE
     MonotonicTimeMs now = monotonicTimeMsNow();
-    CLOG_C_VERBOSE(&self->log, "time is now %lu", now);
-#endif
+    hazyLatencyUpdate(&self->in.latency, now);
+    hazyLatencyUpdate(&self->out.latency, now);
+
     movePacketsToIncomingBuffer(self);
 }
 
@@ -420,29 +142,7 @@ int hazyUpdateAndCommunicate(Hazy* self, UdpTransportInOut* socket)
 
 int hazyFeedRead(Hazy* self, const uint8_t* data, size_t capacity)
 {
-    return hazyPacketsFeed(&self->in.packets, data, capacity, self->in.latency, &self->in.log);
-}
-
-static int hazyPacketsRead(HazyPackets* self, uint8_t* data, size_t capacity, Clog* log)
-{
-    const HazyPacket* packet = hazyFindPacketToActOn(self);
-    if (packet == 0) {
-        return 0;
-    }
-    size_t octetCount = packet->octetCount;
-    if (octetCount <= capacity) {
-        tc_memcpy_octets(data, packet->data, octetCount);
-#if HAZY_LOG_ENABLE
-        CLOG_C_VERBOSE(log, "read copied to target. index: %d, octetCount: %zu", packet->indexForDebug,
-                       packet->octetCount);
-#endif
-    } else {
-        CLOG_C_WARN(log, "couldn't copy to target, capacity too small")
-        octetCount = -4;
-    }
-    hazyDestroyPacket(self, (HazyPacket*) packet);
-
-    return octetCount;
+    return hazyPacketsFeed(&self->in.packets, data, capacity, self->in.latency.latency, &self->in.log);
 }
 
 int hazyRead(Hazy* self, uint8_t* data, size_t capacity)
@@ -452,7 +152,7 @@ int hazyRead(Hazy* self, uint8_t* data, size_t capacity)
     }
 
     uint16_t octetLength = 0;
-    int error = discoidBufferRead(&self->receiveBuffer, (uint8_t *) &octetLength, sizeof(uint16_t));
+    int error = discoidBufferRead(&self->receiveBuffer, (uint8_t*) &octetLength, sizeof(uint16_t));
     if (error < 0) {
         return error;
     }
@@ -463,7 +163,7 @@ int hazyRead(Hazy* self, uint8_t* data, size_t capacity)
 
     discoidBufferRead(&self->receiveBuffer, data, octetLength);
 
-    return (int)octetLength;
+    return (int) octetLength;
 }
 
 int hazyReadSend(Hazy* self, uint8_t* data, size_t capacity)
@@ -471,41 +171,20 @@ int hazyReadSend(Hazy* self, uint8_t* data, size_t capacity)
     return hazyPacketsRead(&self->out.packets, data, capacity, &self->log);
 }
 
-HazyConfigDirection hazyConfigDirectionGoodCondition(void)
-{
-    HazyConfigDirection config = {100, 1, 3, 14, 25, 2};
-
-    return config;
-}
-
-HazyConfigDirection hazyConfigDirectionRecommended(void)
-{
-    HazyConfigDirection config = {100, 1, 7, 14, 150, 4};
-
-    return config;
-}
-
-HazyConfigDirection hazyConfigDirectionWorstCase(void)
-{
-    HazyConfigDirection config = {100, 10, 10, 34, 250, 20};
-
-    return config;
-}
-
 HazyConfig hazyConfigGoodCondition(void)
 {
-    HazyConfig config = {hazyConfigDirectionGoodCondition(), hazyConfigDirectionGoodCondition()};
+    HazyConfig config = {hazyDirectionConfigGoodCondition(), hazyDirectionConfigGoodCondition()};
     return config;
 }
 
 HazyConfig hazyConfigRecommended(void)
 {
-    HazyConfig config = {hazyConfigDirectionRecommended(), hazyConfigDirectionRecommended()};
+    HazyConfig config = {hazyDirectionConfigRecommended(), hazyDirectionConfigRecommended()};
     return config;
 }
 
 HazyConfig hazyConfigWorstCase(void)
 {
-    HazyConfig config = {hazyConfigDirectionRecommended(), hazyConfigDirectionRecommended()};
+    HazyConfig config = {hazyDirectionConfigWorstCase(), hazyDirectionConfigWorstCase()};
     return config;
 }

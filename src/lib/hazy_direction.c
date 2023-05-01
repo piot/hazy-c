@@ -1,0 +1,124 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Peter Bjorklund. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+#include <hazy/direction.h>
+
+void hazyDirectionInit(HazyDirection* self, size_t capacity, struct ImprintAllocatorWithFree* allocatorWithFree, HazyDirectionConfig config, Clog log)
+{
+    hazyPacketsInit(&self->packets, allocatorWithFree);
+    hazyDeciderInit(&self->decider, config.decider, log);
+    hazyLatencyInit(&self->latency, config.latency, log);
+}
+
+void hazyDirectionReset(HazyDirection* self)
+{
+    hazyPacketsInit(&self->packets, self->packets.allocatorWithFree);
+}
+
+void hazyDirectionSetConfig(HazyDirection* self, HazyDirectionConfig config)
+{
+    hazyDeciderSetConfig(&self->decider, config.decider);
+    hazyLatencySetConfig(&self->latency, config.latency);
+}
+
+static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t octetCount, MonotonicTimeMs proposedTime)
+{
+    if (octetCount == 0) {
+        return 0;
+    }
+
+    if (self->packets.packetCount >= HAZY_PACKETS_CAPACITY) {
+        CLOG_C_ERROR(&self->log, "overflow out of space")
+        return -45;
+    }
+
+    HazyPacket* packet = hazyPacketsWrite(&self->packets, data, octetCount, proposedTime, &self->log);
+
+#if HAZY_LOG_ENABLE
+    CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
+                   randomMillisecondsLatency);
+#endif
+
+    return 0;
+}
+
+
+static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
+{
+#if HAZY_LOG_ENABLE
+    CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency);
+#endif
+
+    MonotonicTimeMs now = monotonicTimeMsNow();
+    MonotonicTimeMs proposedTime = now + hazyLatencyGetLatencyWithJitter(&self->latency);
+
+    if (self->packets.lastTimeIsValid) {
+        if ((proposedTime <= self->packets.lastTimeAdded) && !reorderAllowed) {
+            proposedTime = self->packets.lastTimeAdded + 1;
+        }
+    }
+
+    return hazyWriteInternal(self, data, octetCount, proposedTime);
+}
+
+int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCount)
+{
+    HazyDecision decision = hazyDeciderDecide(&self->decider);
+
+    int result = 0;
+    switch (decision) {
+        case HazyDecisionDrop:
+            CLOG_C_VERBOSE(&self->log, "dropped packet")
+            return 0;
+        case HazyDecisionDuplicate:
+            CLOG_C_VERBOSE(&self->log, "duplicate packet")
+            hazyWriteOut(self, data, octetCount, false);
+            result = hazyWriteOut(self, data, octetCount, false);
+            break;
+        case HazyDecisionReorder: {
+            CLOG_C_VERBOSE(&self->log, "reorder packet")
+            // Send this in the future so it is likely reordered
+            MonotonicTimeMs latency = self->latency.latency;
+            const int sendInterval = 16; // 16 ms
+            const int reorderLatency = sendInterval * 3;
+            self->latency.latency += reorderLatency;
+            result = hazyWriteOut(self, data, octetCount, true);
+            self->latency.latency = latency;
+        } break;
+        case HazyDecisionGarble: {
+            uint8_t temp[1200];
+            for (size_t index = 0; index < octetCount; ++index) {
+                temp[index] = (uint8_t) rand();
+            }
+            result = hazyWriteOut(self, temp, octetCount, false);
+            CLOG_C_VERBOSE(&self->log, "garble packet")
+        } break;
+        case HazyDecisionOriginal:
+            CLOG_C_VERBOSE(&self->log, "woriginal")
+            result = hazyWriteOut(self, data, octetCount, false);
+            break;
+        case HazyDecisionMAX:
+            break;
+    }
+
+    return result;
+}
+
+HazyDirectionConfig hazyDirectionConfigGoodCondition(void)
+{
+    HazyDirectionConfig config = {hazyDeciderGoodCondition(), hazyLatencyGoodCondition()};
+    return config;
+}
+
+HazyDirectionConfig hazyDirectionConfigRecommended(void)
+{
+    HazyDirectionConfig config = {hazyDeciderRecommended(), hazyLatencyRecommended()};
+    return config;
+}
+
+HazyDirectionConfig hazyDirectionConfigWorstCase(void)
+{
+    HazyDirectionConfig config = {hazyDeciderRecommended(), hazyLatencyRecommended()};
+    return config;
+}

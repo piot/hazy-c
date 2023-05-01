@@ -28,8 +28,6 @@ void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTranspo
     self->other = other;
 
     hazyInit(&self->hazy, 60, allocator, allocatorWithFree, config, log);
-    self->hazy.out.latency = 50;
-    self->hazy.in.latency = 50;
 }
 
 void hazyDatagramTransportInOutUpdate(HazyDatagramTransportInOut* self)
