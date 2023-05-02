@@ -67,7 +67,7 @@ HazyDeciderConfig hazyDeciderGoodCondition(void)
 
 HazyDeciderConfig hazyDeciderRecommended(void)
 {
-    HazyDeciderConfig config = {1000, 10, 10, 10, 0};
+    HazyDeciderConfig config = {10000, 30, 20, 10, 0};
 
     return config;
 }

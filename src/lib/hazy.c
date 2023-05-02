@@ -86,7 +86,7 @@ static int hazyReadFromUdp(HazyDirection* self, UdpTransportInOut* socket)
     }
 
 #if HAZY_LOG_ENABLE || 1
-    CLOG_C_VERBOSE(&self->log, "read from udp %d", octetsRead);
+    CLOG_C_VERBOSE(&self->log, "read from transport %d", octetsRead);
 #endif
 
     return hazyWriteDirection(self, buf, octetsRead);
