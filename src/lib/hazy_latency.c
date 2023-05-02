@@ -98,7 +98,7 @@ HazyLatencyConfig hazyLatencyGoodCondition(void)
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {33, 99, 6};
+    HazyLatencyConfig config = {99, 250, 6};
 
     return config;
 }
