@@ -20,7 +20,7 @@ typedef struct HazyPacket {
     MonotonicTimeMs created;
 } HazyPacket;
 
-#define HAZY_PACKETS_CAPACITY (256)
+#define HAZY_PACKETS_CAPACITY (120)
 
 typedef struct HazyPackets {
     HazyPacket packets[HAZY_PACKETS_CAPACITY];
