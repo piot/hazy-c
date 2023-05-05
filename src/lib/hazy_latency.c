@@ -30,7 +30,7 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
         return true;
     }
 
-    float changeThisTick = 5.0f * deltaSeconds;
+    float changeThisTick = 0.5f * deltaSeconds;
     if (changeThisTick >= fabs(diff)) {
         return true;
     }
@@ -98,7 +98,7 @@ HazyLatencyConfig hazyLatencyGoodCondition(void)
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {99, 250, 6};
+    HazyLatencyConfig config = {82, 230, 6};
 
     return config;
 }

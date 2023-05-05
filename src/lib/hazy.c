@@ -47,7 +47,7 @@ static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
             break;
         }
 
-        CLOG_C_VERBOSE(log, "send index:%zu %zu ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
+        CLOG_C_VERBOSE(log, "send index:%d %ld ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
         int errorCode = udpTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
             return errorCode;
