@@ -60,7 +60,7 @@ HazyDecision hazyDeciderDecide(HazyDecider* self)
 
 HazyDeciderConfig hazyDeciderGoodCondition(void)
 {
-    HazyDeciderConfig config = {100000, 1, 300, 300, 0};
+    HazyDeciderConfig config = {100000, 1, 30, 30, 0};
 
     return config;
 }
