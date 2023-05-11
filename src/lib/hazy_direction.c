@@ -129,6 +129,6 @@ HazyDirectionConfig hazyDirectionConfigRecommended(void)
 
 HazyDirectionConfig hazyDirectionConfigWorstCase(void)
 {
-    HazyDirectionConfig config = {hazyDeciderRecommended(), hazyLatencyRecommended()};
+    HazyDirectionConfig config = {hazyDeciderWorstCase(), hazyLatencyWorstCase()};
     return config;
 }

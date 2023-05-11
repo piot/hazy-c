@@ -8,7 +8,7 @@
 void hazyLatencyInit(HazyLatency* self, HazyLatencyConfig config, Clog log)
 {
     self->log = log;
-    self->latency = config.maxLatency;
+    self->latency = (config.minLatency +  config.maxLatency) / 2;
     self->targetLatency = self->latency;
     self->config = config;
     self->phase = HazyLatencyPhaseNormal;
@@ -18,9 +18,11 @@ void hazyLatencyInit(HazyLatency* self, HazyLatencyConfig config, Clog log)
 
 void hazyLatencySetConfig(HazyLatency* self, HazyLatencyConfig config)
 {
-    self->latency = config.maxLatency;
+    self->latency = (config.minLatency +  config.maxLatency) / 2;
     self->targetLatency = self->latency;
     self->config = config;
+    self->phase = HazyLatencyPhaseNormal;
+    self->nextDriftEstimationMs = 0;
 }
 
 static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
@@ -91,21 +93,21 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
 
 HazyLatencyConfig hazyLatencyGoodCondition(void)
 {
-    HazyLatencyConfig config = {11, 44, 2};
+    HazyLatencyConfig config = {11, 70, 3};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {82, 230, 6};
+    HazyLatencyConfig config = {82, 180, 6};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyWorstCase(void)
 {
-    HazyLatencyConfig config = {130, 180, 31};
+    HazyLatencyConfig config = {170, 220, 31};
 
     return config;
 }

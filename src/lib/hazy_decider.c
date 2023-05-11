@@ -74,7 +74,7 @@ HazyDeciderConfig hazyDeciderRecommended(void)
 
 HazyDeciderConfig hazyDeciderWorstCase(void)
 {
-    HazyDeciderConfig config = {100, 3, 15, 15, 0};
+    HazyDeciderConfig config = {100, 2, 5, 5, 0};
 
     return config;
 }
