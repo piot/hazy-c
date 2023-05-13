@@ -39,7 +39,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
     }
 
     if (self->packets.packetCount >= HAZY_PACKETS_CAPACITY) {
-        CLOG_C_ERROR(&self->log, "overflow out of space")
+        CLOG_C_NOTICE(&self->log, "overflow out of packet capacity %d", HAZY_PACKETS_CAPACITY)
         return -45;
     }
 
