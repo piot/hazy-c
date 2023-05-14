@@ -33,7 +33,7 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
     }
 
     float changeThisTick = 0.5f * deltaSeconds;
-    if (changeThisTick >= fabs(diff)) {
+    if (changeThisTick >= abs(diff)) {
         return true;
     }
     self->precisionLatency += changeThisTick * tc_sign(diff);
