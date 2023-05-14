@@ -6,18 +6,18 @@
 #define HAZY_TRANSPORT_H
 
 #include <hazy/hazy.h>
-#include <udp-transport/udp_transport.h>
+#include <datagram-transport/transport.h>
 
 struct ImprintAllocatorWithFree;
 struct ImprintAllocator;
 
 typedef struct HazyDatagramTransportInOut {
-    UdpTransportInOut transport;
+    DatagramTransport transport;
     Hazy hazy;
-    UdpTransportInOut other;
+    DatagramTransport other;
 } HazyDatagramTransportInOut;
 
-void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTransportInOut other,
+void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTransport other,
                                     struct ImprintAllocator* allocator,
                                     struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 void hazyDatagramTransportInOutUpdate(HazyDatagramTransportInOut* self);

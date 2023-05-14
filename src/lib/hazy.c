@@ -5,7 +5,7 @@
 #include <clog/clog.h>
 #include <hazy/hazy.h>
 #include <imprint/allocator.h>
-#include <udp-transport/udp_transport.h>
+#include <datagram-transport/transport.h>
 
 #define HAZY_LOG_ENABLE (0)
 
@@ -39,7 +39,7 @@ void hazySetConfig(Hazy* self, HazyConfig config)
     hazyDirectionSetConfig(&self->out, config.out);
 }
 
-static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
+static int hazySend(HazyPackets* self, DatagramTransport* socket, Clog* log)
 {
     while (1) {
         const HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
@@ -48,7 +48,7 @@ static int hazySend(HazyPackets* self, UdpTransportInOut* socket, Clog* log)
         }
 
         CLOG_C_VERBOSE(log, "send index:%d %ld ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
-        int errorCode = udpTransportSend(socket, packet->data, packet->octetCount);
+        int errorCode = datagramTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
             return errorCode;
         }
@@ -77,10 +77,10 @@ int hazyWrite(Hazy* self, const uint8_t* data, size_t octetLength)
     return hazyWriteDirection(&self->out, data, octetLength);
 }
 
-static int hazyReadFromUdp(HazyDirection* self, UdpTransportInOut* socket)
+static int hazyReadFromUdp(HazyDirection* self, DatagramTransport* socket)
 {
     static uint8_t buf[1200];
-    int octetsRead = udpTransportReceive(socket, buf, 1200);
+    int octetsRead = datagramTransportReceive(socket, buf, 1200);
     if (octetsRead <= 0) {
         return octetsRead;
     }
@@ -125,7 +125,7 @@ void hazyUpdate(Hazy* self)
     movePacketsToIncomingBuffer(self);
 }
 
-int hazyUpdateAndCommunicate(Hazy* self, UdpTransportInOut* socket)
+int hazyUpdateAndCommunicate(Hazy* self, DatagramTransport* socket)
 {
     hazyUpdate(self);
     hazySend(&self->out.packets, socket, &self->out.log);

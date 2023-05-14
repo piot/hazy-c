@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct UdpTransportInOut;
+struct DatagramTransport;
 struct ImprintAllocatorWithFree;
 struct ImprintAllocator;
 
@@ -36,7 +36,7 @@ void hazyInit(Hazy* self, size_t capacity, struct ImprintAllocator* allocator,
               struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 void hazyReset(Hazy* self);
 void hazyUpdate(Hazy* self);
-int hazyUpdateAndCommunicate(Hazy* self, struct UdpTransportInOut* socket);
+int hazyUpdateAndCommunicate(Hazy* self, struct DatagramTransport* socket);
 int hazyRead(Hazy* self, uint8_t* data, size_t capacity);
 int hazyWrite(Hazy* self, const uint8_t* data, size_t octetCount);
 void hazySetConfig(Hazy* self, HazyConfig config);

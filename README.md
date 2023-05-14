@@ -30,7 +30,7 @@ The `other` is the datagram transport that Hazy should 'wrap'.
 The `transport` field in `HazyDatagramTransportInOut` should be used for sending and receiving datagrams.
 
 ```c
-void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTransportInOut other,
+void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTransport other,
                                     struct ImprintAllocator* allocator,
                                     struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 ```

@@ -11,14 +11,14 @@ static int hazyDatagramTransportSendFn(void* self_, const uint8_t* data, size_t 
     return hazyWrite(&self->hazy, data, size);
 }
 
-static int hazyDatagramTransportReceiveFn(void* self_, uint8_t* data, size_t size)
+static ssize_t hazyDatagramTransportReceiveFn(void* self_, uint8_t* data, size_t size)
 {
     HazyDatagramTransportInOut* self = self_;
 
     return hazyRead(&self->hazy, data, size);
 }
 
-void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, UdpTransportInOut other,
+void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTransport other,
                                     struct ImprintAllocator* allocator,
                                     struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log)
 {

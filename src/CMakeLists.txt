@@ -38,7 +38,7 @@ add_executable(hazy_example
 
 
 target_include_directories(hazy_example PUBLIC ${deps}piot/tiny-libc/src/include)
-target_include_directories(hazy_example PUBLIC ${deps}piot/udp-transport/src/include)
+target_include_directories(hazy_example PUBLIC ${deps}piot/datagram-transport-c/src/include)
 target_include_directories(hazy_example PUBLIC ${deps}piot/monotonic-time-c/src/include)
 target_include_directories(hazy_example PUBLIC ${deps}piot/clog/src/include)
 target_include_directories(hazy_example PUBLIC ${deps}piot/discoid-c/src/include)
