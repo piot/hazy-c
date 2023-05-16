@@ -15,11 +15,14 @@ typedef struct HazyDatagramTransportInOut {
     DatagramTransport transport;
     Hazy hazy;
     DatagramTransport other;
+    bool debugDiscardIncoming;
 } HazyDatagramTransportInOut;
 
 void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTransport other,
                                     struct ImprintAllocator* allocator,
                                     struct ImprintAllocatorWithFree* allocatorWithFree, HazyConfig config, Clog log);
 void hazyDatagramTransportInOutUpdate(HazyDatagramTransportInOut* self);
+
+void hazyDatagramTransportDebugDiscardIncoming(HazyDatagramTransportInOut* self);
 
 #endif

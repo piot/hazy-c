@@ -15,6 +15,9 @@ static ssize_t hazyDatagramTransportReceiveFn(void* self_, uint8_t* data, size_t
 {
     HazyDatagramTransportInOut* self = self_;
 
+    if (self->debugDiscardIncoming) {
+        return 0;
+    }
     return hazyRead(&self->hazy, data, size);
 }
 
@@ -34,4 +37,9 @@ void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTr
 void hazyDatagramTransportInOutUpdate(HazyDatagramTransportInOut* self)
 {
     hazyUpdateAndCommunicate(&self->hazy, &self->other);
+}
+
+void hazyDatagramTransportDebugDiscardIncoming(HazyDatagramTransportInOut* self)
+{
+    self->debugDiscardIncoming = true;
 }
