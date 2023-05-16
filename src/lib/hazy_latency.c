@@ -74,14 +74,14 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
                 self->targetLatency = calculateTargetLatency(self);
                 self->precisionLatency = self->latency;
                 self->nextDriftEstimationMs = 0;
-                CLOG_C_DEBUG(&self->log, "new target latency: %d", self->targetLatency)
+                CLOG_C_VERBOSE(&self->log, "new target latency: %d", self->targetLatency)
             }
             break;
         case HazyLatencyPhaseDrifting: {
             float deltaSeconds = deltaMs / 1000.0f;
             bool reachedTarget = reachTargetLatency(self, deltaSeconds);
             if (reachedTarget) {
-                CLOG_C_DEBUG(&self->log, "drifting complete %d", self->latency)
+                CLOG_C_VERBOSE(&self->log, "drifting complete %d", self->latency)
                 self->phase = HazyLatencyPhaseNormal;
                 MonotonicTimeMs nextTime = rand() % 1000 + 200;
                 self->nextDriftEstimationMs = now + nextTime;
