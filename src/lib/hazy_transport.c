@@ -28,6 +28,7 @@ void hazyDatagramTransportInOutInit(HazyDatagramTransportInOut* self, DatagramTr
     self->transport.receive = hazyDatagramTransportReceiveFn;
     self->transport.send = hazyDatagramTransportSendFn;
     self->transport.self = self;
+    self->debugDiscardIncoming = false;
 
     self->other = other;
 
