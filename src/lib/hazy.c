@@ -6,6 +6,7 @@
 #include <hazy/hazy.h>
 #include <imprint/allocator.h>
 #include <datagram-transport/transport.h>
+#include <inttypes.h>
 
 #define HAZY_LOG_ENABLE (0)
 
@@ -47,7 +48,7 @@ static int hazySend(HazyPackets* self, DatagramTransport* socket, Clog* log)
             break;
         }
 
-        CLOG_C_VERBOSE(log, "send index:%d %ld ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
+        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
         int errorCode = datagramTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
             return errorCode;
