@@ -49,7 +49,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
 
 #if defined HAZY_LOG_ENABLE
     CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
-                   randomMillisecondsLatency);
+                   randomMillisecondsLatency)
 #else
 (void) packet;
 
@@ -61,7 +61,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
 static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
 {
 #if defined HAZY_LOG_ENABLE
-    CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency);
+    CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency)
 #endif
 
     MonotonicTimeMs now = monotonicTimeMsNow();

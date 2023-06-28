@@ -3,9 +3,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 #include <clog/clog.h>
+#include <datagram-transport/transport.h>
 #include <hazy/hazy.h>
 #include <imprint/allocator.h>
-#include <datagram-transport/transport.h>
 #include <inttypes.h>
 
 #define HAZY_LOG_ENABLE (0)
@@ -50,7 +50,8 @@ static int hazySend(HazyPackets* self, DatagramTransport* socket, Clog* log)
             break;
         }
 
-        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
+        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct,
+                       packet->octetCount)
         int errorCode = datagramTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
             return errorCode;
@@ -66,14 +67,13 @@ static int hazyPacketsFeed(HazyPackets* self, const uint8_t* buf, size_t octetsR
 {
     HazyPacket* packet = hazyPacketsWrite(self, buf, octetsRead, proposedTime, log);
 
-
 #if HAZY_LOG_ENABLE
 
     CLOG_C_VERBOSE(log, "feed packet %d octetCount: %zu, latency: %lu time:%lu", packet->indexForDebug,
-                   packet->octetCount, randomMillisecondsLatency, now);
+                   packet->octetCount, randomMillisecondsLatency, now)
 
 #else
-(void) packet;
+    (void) packet;
 #endif
 
     return 0;
@@ -93,7 +93,7 @@ static ssize_t hazyReadFromUdp(HazyDirection* self, DatagramTransport* socket)
     }
 
 #if HAZY_LOG_ENABLE || 1
-    CLOG_C_VERBOSE(&self->log, "read from transport %d", octetsRead);
+    CLOG_C_VERBOSE(&self->log, "read from transport %zd", octetsRead)
 #endif
 
     return hazyWriteDirection(self, buf, (size_t) octetsRead);
