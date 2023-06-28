@@ -35,10 +35,10 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
 
     float changeThisTick = 0.5f * deltaSeconds;
     //    CLOG_DEBUG("change: %f", changeThisTick)
-    if (changeThisTick >= abs(diff)) {
-        changeThisTick = abs(diff);
+    if (changeThisTick >= 1.0f * abs(diff)) {
+        changeThisTick = 1.0f * abs(diff);
     }
-    self->precisionLatency += changeThisTick * tc_sign(diff);
+    self->precisionLatency += changeThisTick * 1.0f * tc_sign(diff);
     self->latency = (HazyLatencyMs) self->precisionLatency;
 
     return false;
@@ -56,7 +56,7 @@ static HazyLatencyMs calculateTargetLatency(HazyLatency* self)
     if (diff == 0) {
         diff = 1;
     }
-    return (HazyLatencyMs) self->config.minLatency + (HazyLatencyMs)rand() % diff;
+    return (HazyLatencyMs) self->config.minLatency + (HazyLatencyMs) rand() % diff;
 }
 
 void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
@@ -78,7 +78,7 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
             }
             break;
         case HazyLatencyPhaseDrifting: {
-            float deltaSeconds = deltaMs / 1000.0f;
+            float deltaSeconds = (float) deltaMs / 1000.0f;
             bool reachedTarget = reachTargetLatency(self, deltaSeconds);
             if (reachedTarget) {
                 CLOG_C_VERBOSE(&self->log, "drifting complete %d", self->latency)
