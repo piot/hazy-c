@@ -16,6 +16,8 @@ static HazyLatencyConfig halfConfig(HazyLatencyConfig config)
 void hazyDirectionInit(HazyDirection* self, size_t capacity, struct ImprintAllocatorWithFree* allocatorWithFree,
                        HazyDirectionConfig config, Clog log)
 {
+    (void) capacity;
+
     hazyPacketsInit(&self->packets, allocatorWithFree);
     hazyDeciderInit(&self->decider, config.decider, log);
     hazyLatencyInit(&self->latency, halfConfig(config.latency), log);
@@ -45,9 +47,12 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
 
     HazyPacket* packet = hazyPacketsWrite(&self->packets, data, octetCount, proposedTime, &self->log);
 
-#if HAZY_LOG_ENABLE
+#if defined HAZY_LOG_ENABLE
     CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
                    randomMillisecondsLatency);
+#else
+(void) packet;
+
 #endif
 
     return 0;
@@ -55,7 +60,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
 
 static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCount, bool reorderAllowed)
 {
-#if HAZY_LOG_ENABLE
+#if defined HAZY_LOG_ENABLE
     CLOG_C_VERBOSE(&self->log, "write out %zu octetCount latency:%d", octetCount, self->latency);
 #endif
 
@@ -91,7 +96,7 @@ int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCou
         case HazyDecisionOutOfOrder: {
             CLOG_C_VERBOSE(&self->log, "decision: out of order packet")
             // Send this in the future so it is likely reordered
-            MonotonicTimeMs latency = self->latency.latency;
+            HazyLatencyMs latency = self->latency.latency;
             const int sendInterval = 16; // ms
             const int reorderLatency = sendInterval * ((rand() % 3) + 1);
             self->latency.latency += reorderLatency;
