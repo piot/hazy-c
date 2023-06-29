@@ -47,7 +47,7 @@ int hazyPacketsRead(HazyPackets* self, uint8_t* data, size_t capacity, Clog* log
         tc_memcpy_octets(data, packet->data, octetCount);
 #if defined HAZY_LOG_ENABLE
         CLOG_C_VERBOSE(log, "read copied to target. index: %d, octetCount: %zu", packet->indexForDebug,
-                       octetCount);
+                       octetCount)
 #else
         (void) log;
         (void) packet;
