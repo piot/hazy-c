@@ -3,9 +3,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 #include <clog/clog.h>
+#include <datagram-transport/transport.h>
 #include <hazy/hazy.h>
 #include <imprint/allocator.h>
-#include <datagram-transport/transport.h>
 #include <inttypes.h>
 
 #define HAZY_LOG_ENABLE (0)
@@ -42,13 +42,16 @@ void hazySetConfig(Hazy* self, HazyConfig config)
 
 static int hazySend(HazyPackets* self, DatagramTransport* socket, Clog* log)
 {
+    (void) log;
+
     while (1) {
-        const HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
+        HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
         if (packet == 0) {
             break;
         }
 
-        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct, packet->octetCount)
+        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct,
+                       packet->octetCount)
         int errorCode = datagramTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
             return errorCode;
@@ -67,7 +70,10 @@ static int hazyPacketsFeed(HazyPackets* self, const uint8_t* buf, size_t octetsR
 #if HAZY_LOG_ENABLE
 
     CLOG_C_VERBOSE(log, "feed packet %d octetCount: %zu, latency: %lu time:%lu", packet->indexForDebug,
-                   packet->octetCount, randomMillisecondsLatency, now);
+                   packet->octetCount, randomMillisecondsLatency, now)
+
+#else
+    (void) packet;
 #endif
 
     return 0;
@@ -78,25 +84,25 @@ int hazyWrite(Hazy* self, const uint8_t* data, size_t octetLength)
     return hazyWriteDirection(&self->out, data, octetLength);
 }
 
-static int hazyReadFromUdp(HazyDirection* self, DatagramTransport* socket)
+static ssize_t hazyReadFromUdp(HazyDirection* self, DatagramTransport* socket)
 {
     static uint8_t buf[1200];
-    int octetsRead = datagramTransportReceive(socket, buf, 1200);
+    ssize_t octetsRead = datagramTransportReceive(socket, buf, 1200);
     if (octetsRead <= 0) {
         return octetsRead;
     }
 
 #if HAZY_LOG_ENABLE || 1
-    CLOG_C_VERBOSE(&self->log, "read from transport %d", octetsRead);
+    CLOG_C_VERBOSE(&self->log, "read from transport %zd", octetsRead)
 #endif
 
-    return hazyWriteDirection(self, buf, octetsRead);
+    return hazyWriteDirection(self, buf, (size_t) octetsRead);
 }
 
 static void movePacketsToIncomingBuffer(Hazy* self)
 {
     while (1) {
-        const HazyPacket* packet = hazyPacketsFindPacketToActOn(&self->in.packets);
+        HazyPacket* packet = hazyPacketsFindPacketToActOn(&self->in.packets);
         if (packet == 0) {
             return;
         }
@@ -107,13 +113,13 @@ static void movePacketsToIncomingBuffer(Hazy* self)
         if (discoidBufferWriteAvailable(receiveBuffer) < neededOctetCount) {
             CLOG_C_NOTICE(&self->log, "receive buffer is full, so intentionally dropping package")
         } else {
-            uint16_t serializeOctetCount = packet->octetCount;
+            uint16_t serializeOctetCount = (uint16_t) packet->octetCount;
             //            int64_t monotonicTime = packet->timeToAct;
             discoidBufferWrite(receiveBuffer, (const uint8_t*) &serializeOctetCount, 2);
             discoidBufferWrite(receiveBuffer, packet->data, packet->octetCount);
         }
 
-        hazyPacketsDestroyPacket(&self->in.packets, (HazyPacket*) packet);
+        hazyPacketsDestroyPacket(&self->in.packets, packet);
     }
 }
 
@@ -126,13 +132,13 @@ void hazyUpdate(Hazy* self)
     movePacketsToIncomingBuffer(self);
 }
 
-int hazyUpdateAndCommunicate(Hazy* self, DatagramTransport* socket)
+ssize_t hazyUpdateAndCommunicate(Hazy* self, DatagramTransport* socket)
 {
     hazyUpdate(self);
     hazySend(&self->out.packets, socket, &self->out.log);
 
     for (size_t i = 0; i < 30; ++i) {
-        int result = hazyReadFromUdp(&self->in, socket);
+        ssize_t result = hazyReadFromUdp(&self->in, socket);
         if (result < 0) {
             return result;
         }

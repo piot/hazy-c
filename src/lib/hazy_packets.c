@@ -15,7 +15,7 @@ void hazyPacketsInit(HazyPackets* self, struct ImprintAllocatorWithFree* allocat
     self->packetCount = 0;
     self->capacity = HAZY_PACKETS_CAPACITY;
     for (size_t i = 0; i < self->capacity; ++i) {
-        self->packets[i].indexForDebug = i;
+        self->packets[i].indexForDebug = (int) i;
         self->packets[i].octetCount = 0;
         self->packets[i].data = 0;
         self->packets[i].timeToAct = 0;
@@ -37,24 +37,29 @@ static HazyPacket* hazyPacketsFindFree(HazyPackets* self)
 
 int hazyPacketsRead(HazyPackets* self, uint8_t* data, size_t capacity, Clog* log)
 {
-    const HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
+    HazyPacket* packet = hazyPacketsFindPacketToActOn(self);
     if (packet == 0) {
         return 0;
     }
     size_t octetCount = packet->octetCount;
+    int returnValue = (int) octetCount;
     if (octetCount <= capacity) {
         tc_memcpy_octets(data, packet->data, octetCount);
-#if HAZY_LOG_ENABLE
+#if defined HAZY_LOG_ENABLE
         CLOG_C_VERBOSE(log, "read copied to target. index: %d, octetCount: %zu", packet->indexForDebug,
-                       packet->octetCount);
+                       octetCount)
+#else
+        (void) log;
+        (void) packet;
 #endif
     } else {
+        (void) log;
         CLOG_C_WARN(log, "couldn't copy to target, capacity too small")
-        octetCount = -4;
+        returnValue = -4;
     }
-    hazyPacketsDestroyPacket(self, (HazyPacket*) packet);
+    hazyPacketsDestroyPacket(self, packet);
 
-    return octetCount;
+    return returnValue;
 }
 
 HazyPacket* hazyPacketsWrite(HazyPackets* self, const uint8_t* buf, size_t octetsRead, MonotonicTimeMs timeToAct,
@@ -86,19 +91,19 @@ void hazyPacketsDestroyPacket(HazyPackets* self, HazyPacket* packetToDiscard)
     if (self->packetCount == 0) {
         CLOG_ERROR("internal error")
     }
-    IMPRINT_FREE(self->allocatorWithFree, packetToDiscard->data);
+    IMPRINT_FREE(self->allocatorWithFree, (void*) packetToDiscard->data);
     packetToDiscard->data = 0;
     packetToDiscard->octetCount = 0;
     self->packetCount--;
 }
 
-const HazyPacket* hazyPacketsFindPacketToActOn(const HazyPackets* self)
+HazyPacket* hazyPacketsFindPacketToActOn(HazyPackets* self)
 {
     MonotonicTimeMs now = monotonicTimeMsNow();
     MonotonicTimeMs minimumToActOn = 0;
-    const HazyPacket* foundPacket = 0;
+    HazyPacket* foundPacket = 0;
     for (size_t i = 0; i < self->capacity; ++i) {
-        const HazyPacket* packet = &self->packets[i];
+        HazyPacket* packet = &self->packets[i];
         if (!packet->octetCount) {
             continue;
         }

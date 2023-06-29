@@ -16,8 +16,8 @@
 
 static void recalculateRanges(HazyDecider* self, HazyDeciderConfig config)
 {
-    int last = 0;
-    int index = 0;
+    size_t last = 0;
+    size_t index = 0;
 
     HazyDecisionRange* ranges = self->ranges;
 
@@ -43,11 +43,11 @@ void hazyDeciderSetConfig(HazyDecider* self, HazyDeciderConfig config)
 }
 
 /// decide
-/// @param self
-/// @return
+/// @param self decider
+/// @return the decision made
 HazyDecision hazyDeciderDecide(HazyDecider* self)
 {
-    size_t value = rand() % self->max;
+    size_t value = ((size_t)rand() % self->max);
 
     for (size_t i = 0; i < self->rangeCount; ++i) {
         if (value < self->ranges[i].max) {

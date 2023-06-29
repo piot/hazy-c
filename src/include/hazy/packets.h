@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 typedef struct HazyPacket {
-    const uint8_t* data;
+    uint8_t* data;
     size_t octetCount;
     MonotonicTimeMs timeToAct;
     int indexForDebug;
@@ -38,6 +38,6 @@ HazyPacket* hazyPacketsWrite(HazyPackets* self, const uint8_t* buf, size_t octet
 
 void hazyPacketsDestroyPacket(HazyPackets* self, HazyPacket* packetToDiscard);
 
-const HazyPacket* hazyPacketsFindPacketToActOn(const HazyPackets* self);
+HazyPacket* hazyPacketsFindPacketToActOn(HazyPackets* self);
 
 #endif

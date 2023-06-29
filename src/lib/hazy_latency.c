@@ -8,7 +8,7 @@
 void hazyLatencyInit(HazyLatency* self, HazyLatencyConfig config, Clog log)
 {
     self->log = log;
-    self->latency = (config.minLatency + config.maxLatency) / 2;
+    self->latency = (HazyLatencyMs) (config.minLatency + config.maxLatency) / 2;
     self->targetLatency = self->latency;
     self->config = config;
     self->phase = HazyLatencyPhaseNormal;
@@ -18,7 +18,7 @@ void hazyLatencyInit(HazyLatency* self, HazyLatencyConfig config, Clog log)
 
 void hazyLatencySetConfig(HazyLatency* self, HazyLatencyConfig config)
 {
-    self->latency = (config.minLatency + config.maxLatency) / 2;
+    self->latency = (HazyLatencyMs) (config.minLatency + config.maxLatency) / 2;
     self->targetLatency = self->latency;
     self->config = config;
     self->phase = HazyLatencyPhaseNormal;
@@ -34,29 +34,31 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
     }
 
     float changeThisTick = 0.5f * deltaSeconds;
+    float floatDiff = (float) diff;
+    float floatAbsDiff = fabsf(floatDiff);
     //    CLOG_DEBUG("change: %f", changeThisTick)
-    if (changeThisTick >= abs(diff)) {
-        changeThisTick = abs(diff);
+    if (changeThisTick >= floatAbsDiff) {
+        changeThisTick = floatAbsDiff;
     }
-    self->precisionLatency += changeThisTick * tc_sign(diff);
-    self->latency = (int) self->precisionLatency;
+    self->precisionLatency += copysignf(changeThisTick, floatDiff);
+    self->latency = (HazyLatencyMs) self->precisionLatency;
 
     return false;
 }
 
 int hazyLatencyGetLatencyWithJitter(HazyLatency* self)
 {
-    int jitterForThisPacket = rand() % (self->config.latencyJitter + 1);
+    HazyLatencyMs jitterForThisPacket = (HazyLatencyMs) rand() % (self->config.latencyJitter + 1);
     return self->latency + jitterForThisPacket;
 }
 
 static HazyLatencyMs calculateTargetLatency(HazyLatency* self)
 {
-    int diff = self->config.maxLatency - self->config.minLatency;
+    size_t diff = self->config.maxLatency - self->config.minLatency;
     if (diff == 0) {
         diff = 1;
     }
-    return self->config.minLatency + rand() % diff;
+    return (HazyLatencyMs) self->config.minLatency + (HazyLatencyMs) rand() % diff;
 }
 
 void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
@@ -64,7 +66,7 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
     if (!self->lastUpdateTimeMs) {
         self->lastUpdateTimeMs = now;
     }
-    int deltaMs = now - self->lastUpdateTimeMs;
+    MonotonicTimeMs deltaMs = now - self->lastUpdateTimeMs;
     self->lastUpdateTimeMs = now;
 
     switch (self->phase) {
@@ -78,7 +80,7 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
             }
             break;
         case HazyLatencyPhaseDrifting: {
-            float deltaSeconds = deltaMs / 1000.0f;
+            float deltaSeconds = (float) deltaMs / 1000.0f;
             bool reachedTarget = reachTargetLatency(self, deltaSeconds);
             if (reachedTarget) {
                 CLOG_C_VERBOSE(&self->log, "drifting complete %d", self->latency)
@@ -88,7 +90,7 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
             }
         } break;
     }
-#if HAZY_LOG_ENABLE
+#if defined HAZY_LOG_ENABLE
     CLOG_C_VERBOSE(&self->log, "latency: %d (phase %d)", self->latency, self->phase)
 #endif
 }
