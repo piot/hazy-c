@@ -34,11 +34,13 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
     }
 
     float changeThisTick = 0.5f * deltaSeconds;
+    float floatDiff = (float) diff;
+    float floatAbsDiff = fabsf(floatDiff);
     //    CLOG_DEBUG("change: %f", changeThisTick)
-    if (changeThisTick >= 1.0f * abs(diff)) {
-        changeThisTick = 1.0f * abs(diff);
+    if (changeThisTick >= floatAbsDiff) {
+        changeThisTick = floatAbsDiff;
     }
-    self->precisionLatency += changeThisTick * 1.0f * tc_sign(diff);
+    self->precisionLatency += copysignf(changeThisTick, floatDiff);
     self->latency = (HazyLatencyMs) self->precisionLatency;
 
     return false;
