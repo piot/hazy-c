@@ -32,6 +32,7 @@ typedef struct HazyLatency {
     float precisionLatency;
     HazyLatencyMs targetLatency;
     MonotonicTimeMs nextDriftEstimationMs;
+    float latencyDiffPerSecond;
     HazyLatencyConfig config;
     HazyLatencyPhase phase;
     MonotonicTimeMs lastUpdateTimeMs;

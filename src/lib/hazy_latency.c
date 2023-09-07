@@ -33,7 +33,7 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
         return true;
     }
 
-    float changeThisTick = 0.5f * deltaSeconds;
+    float changeThisTick = self->latencyDiffPerSecond * deltaSeconds;
     float floatDiff = (float) diff;
     float floatAbsDiff = fabsf(floatDiff);
     //    CLOG_DEBUG("change: %f", changeThisTick)
@@ -61,6 +61,20 @@ static HazyLatencyMs calculateTargetLatency(HazyLatency* self)
     return (HazyLatencyMs) self->config.minLatency + (HazyLatencyMs) rand() % diff;
 }
 
+
+static float calculateLatencyChangePerSecond(HazyLatency* self)
+{
+    const float normalRamp = 0.5f;
+    const float aggressiveRamp = 50.0f;
+
+    bool timeForAggressiveRamp = (rand() % 20) == 0;
+    if (timeForAggressiveRamp) {
+        CLOG_C_VERBOSE(&self->log, "time for aggressive ramp")
+    }
+
+    return timeForAggressiveRamp ? aggressiveRamp : normalRamp;
+}
+
 void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
 {
     if (!self->lastUpdateTimeMs) {
@@ -74,10 +88,12 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
             if (now >= self->nextDriftEstimationMs) {
                 self->phase = HazyLatencyPhaseDrifting;
                 self->targetLatency = calculateTargetLatency(self);
+                self->latencyDiffPerSecond = calculateLatencyChangePerSecond(self);
                 self->precisionLatency = self->latency;
                 self->nextDriftEstimationMs = 0;
                 CLOG_C_VERBOSE(&self->log, "new target latency: %d", self->targetLatency)
             }
+
             break;
         case HazyLatencyPhaseDrifting: {
             float deltaSeconds = (float) deltaMs / 1000.0f;
@@ -104,14 +120,14 @@ HazyLatencyConfig hazyLatencyGoodCondition(void)
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {82, 180, 6};
+    HazyLatencyConfig config = {82, 170, 6};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyWorstCase(void)
 {
-    HazyLatencyConfig config = {150, 190, 6};
+    HazyLatencyConfig config = {120, 180, 6};
 
     return config;
 }

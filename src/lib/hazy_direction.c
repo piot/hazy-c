@@ -18,9 +18,13 @@ void hazyDirectionInit(HazyDirection* self, size_t capacity, struct ImprintAlloc
 {
     (void) capacity;
 
+    self->nextPacketDropBurstMs = 0;
+    self->nextPacketDropBurstEndMs = 0;
     hazyPacketsInit(&self->packets, allocatorWithFree);
     hazyDeciderInit(&self->decider, config.decider, log);
     hazyLatencyInit(&self->latency, halfConfig(config.latency), log);
+    self->config = config.direction;
+    self->phase = HazyDirectionPhaseNormal;
 }
 
 void hazyDirectionReset(HazyDirection* self)
@@ -32,6 +36,7 @@ void hazyDirectionSetConfig(HazyDirection* self, HazyDirectionConfig config)
 {
     hazyDeciderSetConfig(&self->decider, config.decider);
     hazyLatencySetConfig(&self->latency, halfConfig(config.latency));
+    self->config = config.direction;
 }
 
 static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t octetCount, MonotonicTimeMs proposedTime)
@@ -41,7 +46,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
     }
 
     if (self->packets.packetCount >= HAZY_PACKETS_CAPACITY) {
-        CLOG_C_NOTICE(&self->log, "overflow out of packet capacity %d", HAZY_PACKETS_CAPACITY)
+        CLOG_C_VERBOSE(&self->log, "overflow out of packet capacity %d", HAZY_PACKETS_CAPACITY)
         return -45;
     }
 
@@ -51,7 +56,7 @@ static int hazyWriteInternal(HazyDirection* self, const uint8_t* data, size_t oc
     CLOG_C_VERBOSE(&self->log, "packet set index %d,  %zu, latency: %lu", packet->indexForDebug, packet->octetCount,
                    randomMillisecondsLatency)
 #else
-(void) packet;
+    (void) packet;
 
 #endif
 
@@ -76,8 +81,38 @@ static int hazyWriteOut(HazyDirection* self, const uint8_t* data, size_t octetCo
     return hazyWriteInternal(self, data, octetCount, proposedTime);
 }
 
+void hazyDirectionUpdate(HazyDirection* self, MonotonicTimeMs now)
+{
+    switch (self->phase) {
+        case HazyDirectionPhaseNormal:
+            if (now >= self->nextPacketDropBurstMs && self->config.dropBurstTimeSpanMs != 0) {
+                size_t dropDuration = (size_t) (rand() % (int) self->config.dropBurstTimeSpanMs) +
+                                      self->config.dropBurstTimeMinimumMs;
+                CLOG_C_DEBUG(&self->log, "start packet drop burst for %zu ms", dropDuration)
+                self->phase = HazyDirectionPhasePacketDropBurst;
+                self->nextPacketDropBurstEndMs = now + (MonotonicTimeMs) dropDuration;
+                self->nextPacketDropBurstMs = 0;
+            }
+            break;
+        case HazyDirectionPhasePacketDropBurst:
+            if (now >= self->nextPacketDropBurstEndMs && self->config.timeBetweenDropBurstSpanMs) {
+                size_t timeUntilNextDropBurst = (size_t) (rand() % (int) self->config.timeBetweenDropBurstSpanMs) +
+                                                self->config.timeBetweenDropBurstMinimumMs;
+                CLOG_C_DEBUG(&self->log, "packet drop burst over. Will wait %zu ms until the next one", timeUntilNextDropBurst)
+                self->phase = HazyDirectionPhaseNormal;
+                self->nextPacketDropBurstMs = now + (MonotonicTimeMs) timeUntilNextDropBurst;
+            }
+            break;
+    }
+}
+
 int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCount)
 {
+    if (self->phase == HazyDirectionPhasePacketDropBurst) {
+        CLOG_C_VERBOSE(&self->log, "decision: dropped packet due to packet drop burst")
+        return 0;
+    }
+
     HazyDecision decision = hazyDeciderDecide(&self->decider);
 
     int result = 0;
@@ -120,20 +155,38 @@ int hazyWriteDirection(HazyDirection* self, const uint8_t* data, size_t octetCou
     return result;
 }
 
+HazyDirectionOnlyConfig hazyDirectionOnlyConfigGoodCondition(void)
+{
+    HazyDirectionOnlyConfig config = {0, 0, 0, 0};
+    return config;
+}
+
+HazyDirectionOnlyConfig hazyDirectionOnlyConfigRecommended(void)
+{
+    HazyDirectionOnlyConfig config = {60000, 10000, 100, 10};
+    return config;
+}
+
+HazyDirectionOnlyConfig hazyDirectionOnlyConfigWorstCase(void)
+{
+    HazyDirectionOnlyConfig config = {10000, 2000, 300, 100};
+    return config;
+}
+
 HazyDirectionConfig hazyDirectionConfigGoodCondition(void)
 {
-    HazyDirectionConfig config = {hazyDeciderGoodCondition(), hazyLatencyGoodCondition()};
+    HazyDirectionConfig config = {hazyDeciderGoodCondition(), hazyLatencyGoodCondition(), hazyDirectionOnlyConfigGoodCondition()};
     return config;
 }
 
 HazyDirectionConfig hazyDirectionConfigRecommended(void)
 {
-    HazyDirectionConfig config = {hazyDeciderRecommended(), hazyLatencyRecommended()};
+    HazyDirectionConfig config = {hazyDeciderRecommended(), hazyLatencyRecommended(), hazyDirectionOnlyConfigRecommended()};
     return config;
 }
 
 HazyDirectionConfig hazyDirectionConfigWorstCase(void)
 {
-    HazyDirectionConfig config = {hazyDeciderWorstCase(), hazyLatencyWorstCase()};
+    HazyDirectionConfig config = {hazyDeciderWorstCase(), hazyLatencyWorstCase(), hazyDirectionOnlyConfigWorstCase()};
     return config;
 }

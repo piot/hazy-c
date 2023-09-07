@@ -127,7 +127,10 @@ void hazyUpdate(Hazy* self)
 {
     MonotonicTimeMs now = monotonicTimeMsNow();
     hazyLatencyUpdate(&self->in.latency, now);
+    hazyDirectionUpdate(&self->in, now);
+
     hazyLatencyUpdate(&self->out.latency, now);
+    hazyDirectionUpdate(&self->out, now);
 
     movePacketsToIncomingBuffer(self);
 }
