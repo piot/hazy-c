@@ -61,7 +61,6 @@ static HazyLatencyMs calculateTargetLatency(HazyLatency* self)
     return (HazyLatencyMs) self->config.minLatency + (HazyLatencyMs) rand() % diff;
 }
 
-
 static float calculateLatencyChangePerSecond(HazyLatency* self)
 {
     const float normalRamp = 0.5f;
@@ -69,7 +68,11 @@ static float calculateLatencyChangePerSecond(HazyLatency* self)
 
     bool timeForAggressiveRamp = (rand() % 20) == 0;
     if (timeForAggressiveRamp) {
+#if defined CLOG_LOG_ENABLED
         CLOG_C_VERBOSE(&self->log, "time for aggressive ramp")
+#else
+        (void) self;
+#endif
     }
 
     return timeForAggressiveRamp ? aggressiveRamp : normalRamp;
