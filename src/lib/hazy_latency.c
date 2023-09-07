@@ -29,6 +29,7 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
 {
     int diff = ((int) self->targetLatency - (int) self->precisionLatency);
     if (abs(diff) < 1) {
+        //CLOG_C_VERBOSE(&self->log, "hit target %f", self->precisionLatency)
         self->latency = self->targetLatency;
         return true;
     }
@@ -36,10 +37,12 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
     float changeThisTick = self->latencyDiffPerSecond * deltaSeconds;
     float floatDiff = (float) diff;
     float floatAbsDiff = fabsf(floatDiff);
-    //    CLOG_DEBUG("change: %f", changeThisTick)
     if (changeThisTick >= floatAbsDiff) {
         changeThisTick = floatAbsDiff;
     }
+
+    //CLOG_C_VERBOSE(&self->log, "deltaTime: %f changeThisTick: %f", deltaSeconds, changeThisTick)
+
     self->precisionLatency += copysignf(changeThisTick, floatDiff);
     self->latency = (HazyLatencyMs) self->precisionLatency;
 
@@ -63,10 +66,10 @@ static HazyLatencyMs calculateTargetLatency(HazyLatency* self)
 
 static float calculateLatencyChangePerSecond(HazyLatency* self)
 {
-    const float normalRamp = 0.5f;
+    const float normalRamp = 2.0f;
     const float aggressiveRamp = 50.0f;
 
-    bool timeForAggressiveRamp = (rand() % 20) == 0;
+    bool timeForAggressiveRamp = (rand() % 10) == 0;
     if (timeForAggressiveRamp) {
 #if defined CLOG_LOG_ENABLED
         CLOG_C_VERBOSE(&self->log, "time for aggressive ramp")
@@ -116,21 +119,21 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
 
 HazyLatencyConfig hazyLatencyGoodCondition(void)
 {
-    HazyLatencyConfig config = {11, 70, 3};
+    HazyLatencyConfig config = {21, 70, 3};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {82, 170, 6};
+    HazyLatencyConfig config = {50, 100, 7};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyWorstCase(void)
 {
-    HazyLatencyConfig config = {120, 180, 6};
+    HazyLatencyConfig config = {100, 180, 1};
 
     return config;
 }

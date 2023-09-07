@@ -169,7 +169,7 @@ HazyDirectionOnlyConfig hazyDirectionOnlyConfigRecommended(void)
 
 HazyDirectionOnlyConfig hazyDirectionOnlyConfigWorstCase(void)
 {
-    HazyDirectionOnlyConfig config = {10000, 2000, 300, 100};
+    HazyDirectionOnlyConfig config = {10000, 5000, 100, 50};
     return config;
 }
 
