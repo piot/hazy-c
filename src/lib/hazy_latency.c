@@ -51,7 +51,14 @@ static bool reachTargetLatency(HazyLatency* self, float deltaSeconds)
 
 int hazyLatencyGetLatencyWithJitter(HazyLatency* self)
 {
-    HazyLatencyMs jitterForThisPacket = (HazyLatencyMs) rand() % (self->config.latencyJitter + 1);
+    HazyLatencyMs jitterForThisPacket = (HazyLatencyMs) rand() % (self->config.latencyJitter * 2 + 1);
+
+    bool jitterSpikeThisPacket = (rand() % (int)self->config.chanseJitterSpike) == 0;
+    if (jitterSpikeThisPacket)
+    {
+        jitterForThisPacket *= 3;
+    }
+
     return self->latency + jitterForThisPacket;
 }
 
@@ -119,21 +126,21 @@ void hazyLatencyUpdate(HazyLatency* self, MonotonicTimeMs now)
 
 HazyLatencyConfig hazyLatencyGoodCondition(void)
 {
-    HazyLatencyConfig config = {21, 70, 3};
+    HazyLatencyConfig config = {38/2, 45/2, 6, 1000};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyRecommended(void)
 {
-    HazyLatencyConfig config = {50, 100, 7};
+    HazyLatencyConfig config = {70/2, 90/2, 16, 50};
 
     return config;
 }
 
 HazyLatencyConfig hazyLatencyWorstCase(void)
 {
-    HazyLatencyConfig config = {100, 180, 1};
+    HazyLatencyConfig config = {100, 180, 32, 30};
 
     return config;
 }

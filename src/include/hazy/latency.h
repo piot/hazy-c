@@ -18,6 +18,7 @@ typedef struct HazyLatencyConfig {
     size_t minLatency;
     size_t maxLatency;
     size_t latencyJitter;
+    size_t chanseJitterSpike;
 } HazyLatencyConfig;
 
 typedef uint16_t HazyLatencyMs;

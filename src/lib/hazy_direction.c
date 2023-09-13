@@ -6,7 +6,7 @@
 
 static HazyLatencyConfig halfConfig(HazyLatencyConfig config)
 {
-    config.latencyJitter = config.latencyJitter / 2;
+    config.latencyJitter = config.latencyJitter;
     config.minLatency = config.minLatency / 2;
     config.maxLatency = config.maxLatency / 2;
 
