@@ -70,6 +70,7 @@ function(set_tornado targetName)
               -Wno-disabled-macro-expansion # bug in emscripten compiler?
               -Wno-poison-system-directories # might be bug in emscripten
                                              # compiler?
+              -Wno-switch-default # clang does not understand enums, and reports the warning even if all cases are handled
               -Wno-switch-enum # if there is a explicit default case, then it
               # should not be reported as an error
               ${sanitizers})
