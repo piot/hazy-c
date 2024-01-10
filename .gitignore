@@ -11,6 +11,7 @@ CMakeFiles/
 build/
 Makefile
 *.a
-*.cmake
 CMakeCache.txt
 src/hazy_example
+CTestTestfile.cmake
+cmake_install.cmake
