@@ -50,7 +50,7 @@ static int hazySend(HazyPackets* self, DatagramTransport* socket, Clog* log)
             break;
         }
 
-        CLOG_C_VERBOSE(log, "send index:%d %" PRIX64 " ms %zu", packet->indexForDebug, packet->timeToAct,
+        CLOG_C_VERBOSE(log, "send index:%d %" PRId64 " ms %zu", packet->indexForDebug, packet->timeToAct,
                        packet->octetCount)
         int errorCode = datagramTransportSend(socket, packet->data, packet->octetCount);
         if (errorCode < 0) {
